@@ -421,7 +421,7 @@ function injectContentScriptForCustomProvider(tab) {
         if (tab.url.includes(customUrl.hostname)) {
           chrome.scripting.executeScript({
             target: { tabId: tab.id },
-            files: ['constants.js', 'marked.js', 'content.js']
+            files: ['marked.js', 'content.js']
           }, () => {
             if (chrome.runtime.lastError) {
               console.error('Error injecting content script:', chrome.runtime.lastError);
