@@ -32,20 +32,17 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
    ```bash
    cd YoutubeSummarAI
    ```
-3. Set up a virtual environment (recommended):
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows use `venv\Scripts\activate`
-   ```
-4. Install dependencies:
+3. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
-5. Set up environment variables:
+4. Set up environment variables:
    - Create a `.env` file in the `YoutubeToText` directory
-   - Add necessary API keys  (refer to `.env.example`)
+   - Add necessary API keys  (refer to `YoutubeSummarAI\YoutubeToText\.env.example`)
    - TODO: Make backend models configurable via file (currently hardcoded Llama 3.1 setup, you can put the llama 3.1 GGUF model file in the `YoutubeToText` directory)
    - Backend can be either run with ad-hoc `python main.py` or installed as windows service with `python main.py install` and uninstalled with `python main.py remove`
+
+*note: if you are using the `python main.py install` option, you will need to run the command prompt with admin privileges*
 
 ### Chrome Extension Setup
 
