@@ -8,10 +8,10 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
 
 ## Features
 
-- Extract text from YouTube videos using local speech recognition via Whisper or use YoutubeToText API
-- Generate summaries using state-of-the-art AI models and subscription services
-- Chrome extension for seamless integration with YouTube
-- Support for multiple languages (planned feature)
+- Extract speech from YouTube videos using local speech recognition via Whisper or use YoutubeToText API
+- Generate summaries using local AI models or popular AI services
+- Chrome extension for seamless integration with YouTube 
+- Support for multiple source languages (summaries currently only support English)
 - Customizable summary length and style (planned feature)
 
 ## Project Structure
@@ -60,12 +60,13 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
 
 ## Technologies Used
 
-- Python 3.8+
+- Python 3.10+
   - Speech recognition libraries for text extraction
   - Natural Language Processing (NLP) libraries for summarization
 - JavaScript (ES6+) for Chrome extension
 - AI Models:
-  - Meta-Llama-3.1-8B-Instruct for advanced language understanding and generation
+  - Meta-Llama-3.1-8B-Instruct for local summary generation
+  - OpenAI Whisper for Youtube video to text transcription
 - Chrome Extension APIs
 
 ## Development
@@ -84,17 +85,16 @@ To contribute to the development:
 This project is licensed under the [MIT License](LICENSE).
 
 ## Acknowledgements
-
-- YouTube API for video data access
-- Meta AI for their Llama model
+- https://pypi.org/project/youtube-transcript-api/ for the Youtube transcript API
+- https://github.com/openai/whisper for the Whisper models
+- https://github.com/ggerganov/llama.cpp for the local inference capabilites
 - Contributors and open-source projects that made this possible
 
 ## Roadmap
 
-- Implement multi-language support
-- Add customizable summary lengths
-- Integrate with more video platforms
-- Develop a web application version
+- Make backend models and setup configurable via parameters
+- Add customizable summary lengths and styles
+- Integrate with more video platforms/sources
 
 ## Contact
 
