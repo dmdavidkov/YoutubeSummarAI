@@ -58,6 +58,34 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
 3. Select desired summary options (if available)
 4. Click "Generate Summary" to get a concise summary of the video content
 
+## Options page
+
+The extension's options page allows users to customize various settings:
+
+1. Transcription Method:
+   - Choose between YouTube API or different Whisper models for transcribing video content.
+   - Options include YouTube API, Whisper (Base), Whisper (Base English), Whisper (Tiny), etc.
+
+2. Process Locally:
+   - Toggle between processing summaries locally or using an external AI provider.
+   - Options: Yes or No
+
+3. AI Provider (when not processing locally):
+   - Select from various AI providers for summary generation.
+   - Options are dynamically populated based on available providers.
+
+4. Provider-specific settings:
+   - Each AI provider has its own set of configurable options:
+     - URL: The endpoint for the AI service
+     - Input Selector: CSS selector for the input field
+     - Button Selector: CSS selector for the submit button
+     - Confirm Button Selector: CSS selector for any confirmation button (if applicable)
+     - Result Selector: CSS selector for the generated summary
+
+*note: The selectors are subject to change as the UI of the providers change. You can find the correct selectors by inspecting the elements in the page.*
+
+These options can be accessed and modified through the extension's options page, which can be reached by right-clicking the extension icon and selecting "Options" or through the Chrome extensions management page.
+
 ## Technologies Used
 
 - Python 3.10+
