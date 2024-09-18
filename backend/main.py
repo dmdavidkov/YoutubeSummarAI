@@ -32,7 +32,7 @@ os.makedirs(log_dir, exist_ok=True)
 log_file = os.path.join(log_dir, 'youtube_transcription_service.log')
 
 handler = FileHandler(log_file, mode='w', encoding='utf-8')
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter('%(asctime)s - main - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
 
 logger = logging.getLogger()
@@ -53,16 +53,6 @@ load_dotenv(dotenv_path)
 app = Flask(__name__)
 yt_api_Key = os.environ.get('YOUTUBE_API_KEY')
 hf_auth_token = os.environ.get('HF_AUTH_TOKEN')
-
-if not yt_api_Key:
-    logger.error(f"YouTube API key not found in environment variables. Checked .env file at: {dotenv_path}")
-else:
-    logger.info("YouTube API key loaded successfully")
-
-if not hf_auth_token:
-    logger.error(f"Hugging Face auth token not found in environment variables. Checked .env file at: {dotenv_path}")
-else:
-    logger.info("Hugging Face auth token loaded successfully")
 
 # Add a global variable to store the last response
 last_response_cache = None
@@ -148,7 +138,11 @@ def transcribe_audio(audio_path, video_details):
             text = segment["text"]
             speaker = segment.get("speaker") if isinstance(segment, dict) else None
             transcription += f"[{start_time} - {end_time}] {speaker}: {text}\n"
-        
+            
+        # Clear GPU memory
+        if device == "cuda":
+            torch.cuda.empty_cache()
+            logger.info("GPU memory cleared after transcription")
         return transcription
     
     except Exception as e:
@@ -494,20 +488,25 @@ def run_server():
 def process_with_llama(prompt):
     logger.info("Processing prompt with Llama 3.1 8B model")
     try:
-        # Get the directory of the current script
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        # Construct the full path to run_llama.py
         run_llama_path = os.path.join(current_dir, "run_llama.py")
         
         logger.info(f"Attempting to run Llama model with script at: {run_llama_path}")
+        
+        # Pass the log file path as an environment variable
+        env = {
+            **os.environ,
+            'PYTHONPATH': current_dir,
+            'LOG_FILE_PATH': log_file  # Assuming log_file is defined earlier in main.py
+        }
         
         result = subprocess.run(
             ["python", run_llama_path, prompt],
             capture_output=True,
             text=True,
-            check=True
+            check=True,
+            env=env
         )
-        # logger.info(f"Llama model output: {result.stdout.strip()}")
         return result.stdout.strip()
     except subprocess.CalledProcessError as e:
         logger.error(f"Error processing with Llama model: {e}")
