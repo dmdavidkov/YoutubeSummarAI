@@ -30,7 +30,7 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
    ```
 2. Navigate to the project directory:
    ```bash
-   cd YoutubeSummarAI
+   cd YoutubeSummarAI/YoutubeToText
    ```
 3. Install dependencies:
    ```bash
