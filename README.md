@@ -85,7 +85,7 @@ To contribute to the development:
 This project is licensed under the [MIT License](LICENSE).
 
 ## Acknowledgements
-- https://pypi.org/project/youtube-transcript-api/ for the Youtube transcript API
+- https://github.com/jdepoix/youtube-transcript-api for the Youtube transcript API
 - https://github.com/openai/whisper for the Whisper models
 - https://github.com/ggerganov/llama.cpp for the local inference capabilites
 - Contributors and open-source projects that made this possible
