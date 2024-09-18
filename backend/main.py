@@ -138,7 +138,7 @@ def transcribe_audio(audio_path, video_details):
             text = segment["text"]
             speaker = segment.get("speaker") if isinstance(segment, dict) else None
             transcription += f"[{start_time} - {end_time}] {speaker}: {text}\n"
-            
+           
         # Clear GPU memory
         if device == "cuda":
             torch.cuda.empty_cache()
@@ -149,6 +149,11 @@ def transcribe_audio(audio_path, video_details):
         logger.error(f"Error during transcription: {e}")
         traceback.print_exc()
         return None
+    
+def format_timestamp(seconds):
+    minutes, seconds = divmod(int(seconds), 60)
+    hours, minutes = divmod(minutes, 60)
+    return f"{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}"
 
 @app.route('/transcribe', methods=['POST'])
 def transcribe():
