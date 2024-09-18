@@ -10,7 +10,7 @@ import re
 import requests
 from dotenv import load_dotenv 
 import logging
-from logging.handlers import RotatingFileHandler
+from logging import FileHandler
 import win32serviceutil
 import win32service
 import win32event
@@ -24,13 +24,14 @@ from youtube_transcript_api import YouTubeTranscriptApi
 import subprocess
 import numpy as np
 import codecs
+import socket
 
 # Set up logging
 log_dir = os.path.join(os.environ['PROGRAMDATA'], 'YouTubeTranscriptionService')
 os.makedirs(log_dir, exist_ok=True)
 log_file = os.path.join(log_dir, 'youtube_transcription_service.log')
 
-handler = RotatingFileHandler(log_file, maxBytes=10*1024*1024, backupCount=5, encoding='utf-8')
+handler = FileHandler(log_file, mode='w', encoding='utf-8')
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
 
@@ -401,6 +402,7 @@ class ServerThread(threading.Thread):
         self.ctx.push()
 
     def run(self):
+        # Add this log message
         self.server.serve_forever()
 
     def shutdown(self):
@@ -458,14 +460,35 @@ class YouTubeTranscriptionService(win32serviceutil.ServiceFramework):
         win32event.WaitForSingleObject(self.hWaitStop, win32event.INFINITE)
 
     def main(self):
+        ip_address = get_local_ip()
+        port = 5000  # You can change this if needed
+        logger.info(f"Starting server. API will be accessible at http://{ip_address}:{port}")
         server = ServerThread(app)
         server.start()
         while self.is_alive:
             time.sleep(1)
         server.shutdown()
 
+def get_local_ip():
+    try:
+        # This method gets the IP address the machine uses to connect to the internet
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+        return local_ip
+    except Exception as e:
+        logger.error(f"Error getting local IP: {e}")
+        return '127.0.0.1'  # Return localhost if an error occurs
+    
 def run_server():
     load_models("base")  # Explicitly load the "base" model on startup
+    
+    # Get the actual IP address of the machine
+    ip_address = get_local_ip()
+    
+    # Add this log message with the correct IP address
+    logger.info(f"Starting server. API will be accessible at http://{ip_address}:5000")
     app.run(host='0.0.0.0', port=5000)
 
 def process_with_llama(prompt):

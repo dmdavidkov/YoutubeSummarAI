@@ -87,6 +87,7 @@ function saveOptions() {
     const aiProvider = document.getElementById('aiProvider')?.value;
     const transcriptionMethod = document.getElementById('transcriptionMethod')?.value;
     const processLocally = document.getElementById('processLocally')?.value === 'true';
+    const backendUrl = document.getElementById('backendUrl').value;
 
     if (!aiProvider || !transcriptionMethod) {
         console.error('Required elements not found');
@@ -96,6 +97,7 @@ function saveOptions() {
     const settings = {
         transcriptionMethod: transcriptionMethod,
         processLocally: processLocally,
+        backendUrl: backendUrl
     };
 
     if (!processLocally) {
@@ -141,7 +143,13 @@ function saveOptions() {
 
 // Restores select box state using the preferences stored in chrome.storage.
 function restoreOptions() {
-    chrome.storage.sync.get(['aiProvider', 'providers', 'transcriptionMethod', 'processLocally'], (items) => {
+    chrome.storage.sync.get({
+        aiProvider: DEFAULT_AI_PROVIDER,
+        providers: DEFAULT_PROVIDER_SETTINGS,
+        transcriptionMethod: DEFAULT_TRANSCRIPTION_METHOD,
+        processLocally: DEFAULT_PROCESS_LOCALLY,
+        backendUrl: DEFAULT_BACKEND_URL
+    }, (items) => {
         if (items.processLocally !== undefined) {
             document.getElementById('processLocally').value = items.processLocally.toString();
             handleProcessLocallyChange();
@@ -184,6 +192,8 @@ function restoreOptions() {
         } else {
             document.getElementById('transcriptionMethod').value = DEFAULT_TRANSCRIPTION_METHOD;
         }
+
+        document.getElementById('backendUrl').value = items.backendUrl || DEFAULT_BACKEND_URL;
     });
 }
 

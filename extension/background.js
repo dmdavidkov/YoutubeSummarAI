@@ -189,22 +189,28 @@ function generateSummary(videoUrl) {
 }
 
 function createFetchPromise(videoUrl, controller, transcriptionMethod, processLocally) {
-    let body = { 
-        url: videoUrl, 
-        transcriptionMethod: transcriptionMethod,
-        processLocally: processLocally
-    };
-    
-    if (transcriptionMethod.startsWith('whisper')) {
-        const [method, model] = transcriptionMethod.split(':');
-        body = { ...body, transcriptionMethod: method, whisperModel: model };
-    }
+    return new Promise((resolve, reject) => {
+        chrome.storage.sync.get(['backendUrl'], function(items) {
+            const backendUrl = items.backendUrl || DEFAULT_BACKEND_URL;
+            
+            let body = { 
+                url: videoUrl, 
+                transcriptionMethod: transcriptionMethod,
+                processLocally: processLocally
+            };
+            
+            if (transcriptionMethod.startsWith('whisper')) {
+                const [method, model] = transcriptionMethod.split(':');
+                body = { ...body, transcriptionMethod: method, whisperModel: model };
+            }
 
-    return fetch('http://192.168.100.2:5000/transcribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: controller.signal
+            fetch(`${backendUrl}/transcribe`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+                signal: controller.signal
+            }).then(resolve).catch(reject);
+        });
     });
 }
 

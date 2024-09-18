@@ -26,13 +26,14 @@
         h1 {
             color: #333;
             margin-top: 0;
+            margin-bottom: 20px;
         }
         label {
             display: block;
-            margin-bottom: 10px;
+            margin-bottom: 5px;
             color: #666;
         }
-        select {
+        select, input[type="text"] {
             width: 100%;
             padding: 10px;
             margin-bottom: 20px;
@@ -40,6 +41,7 @@
             border-radius: 4px;
             background-color: #fff;
             font-size: 16px;
+            box-sizing: border-box;
         }
         button {
             background-color: #4CAF50;
@@ -54,7 +56,7 @@
         button:hover {
             background-color: #45a049;
         }
-        #status {
+        #status, #selectorStatus {
             margin-top: 20px;
             text-align: center;
             color: #4CAF50;
@@ -69,14 +71,6 @@
         .input-group {
             margin-bottom: 10px;
         }
-        label {
-            display: inline-block;
-            width: 150px;
-        }
-        input[type="text"] {
-            width: 300px;
-            padding: 5px;
-        }
     </style>
     <script src="constants.js"></script>
     <script src="options.js"></script>
@@ -85,7 +79,10 @@
     <div class="container">
         <h1>YouTube Summary Generator Options</h1>
         
-        <!-- Add this new section -->
+        <!-- Move the backend URL input to the top -->
+        <label for="backendUrl">Backend URL:</label>
+        <input type="text" id="backendUrl" name="backendUrl">
+        
         <label for="transcriptionMethod">Transcription Method:</label>
         <select id="transcriptionMethod">
             <option value="youtube">YouTube API</option>

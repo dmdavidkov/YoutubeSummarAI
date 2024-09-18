@@ -46,18 +46,22 @@ if (typeof DEFAULT_PROVIDER_SETTINGS === 'undefined') {
     const DEFAULT_TRANSCRIPTION_METHOD = 'youtube';
     const DEFAULT_PROCESS_LOCALLY = false;
 
+    const DEFAULT_BACKEND_URL = 'http://192.168.100.2:5000';
+
     // Export the constants
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = {
             DEFAULT_PROVIDER_SETTINGS,
             DEFAULT_AI_PROVIDER,
             DEFAULT_TRANSCRIPTION_METHOD,
-            DEFAULT_PROCESS_LOCALLY
+            DEFAULT_PROCESS_LOCALLY,
+            DEFAULT_BACKEND_URL
         };
     } else if (typeof window !== 'undefined') {
         window.DEFAULT_PROVIDER_SETTINGS = DEFAULT_PROVIDER_SETTINGS;
         window.DEFAULT_AI_PROVIDER = DEFAULT_AI_PROVIDER;
         window.DEFAULT_TRANSCRIPTION_METHOD = DEFAULT_TRANSCRIPTION_METHOD;
         window.DEFAULT_PROCESS_LOCALLY = DEFAULT_PROCESS_LOCALLY;
+        window.DEFAULT_BACKEND_URL = DEFAULT_BACKEND_URL;
     }
 }

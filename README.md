@@ -17,8 +17,8 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
 ## Project Structure
 
 - `YoutubeSummarAI/`: Main project directory
-  - `Youtubevpplx/`: Chrome extension directory
-  - `YoutubeToText/`: Backend directory
+  - `backend/`: Backend directory
+  - `extension/`: Chrome extension directory
 
 ## Installation
 
@@ -30,16 +30,16 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
    ```
 2. Navigate to the project directory:
    ```bash
-   cd YoutubeSummarAI/YoutubeToText
+   cd YoutubeSummarAI/backend
    ```
 3. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 4. Set up environment variables:
-   - Create a `.env` file in the `YoutubeToText` directory
-   - Add necessary API keys  (refer to `YoutubeSummarAI\YoutubeToText\.env.example`)
-   - TODO: Make backend models configurable via file (currently hardcoded Llama 3.1 setup, you can put the llama 3.1 GGUF model file in the `YoutubeToText` directory)
+   - Create a `.env` file in the `backend` directory
+   - Add necessary API keys  (refer to `YoutubeSummarAI\backend\.env.example`)
+   - TODO: Make backend models configurable via file (currently hardcoded Llama 3.1 setup, you can put the llama 3.1 GGUF model file in the `backend` directory)
    - Backend can be either run with ad-hoc `python main.py` or installed as windows service with `python main.py install` and uninstalled with `python main.py remove`
 
 *note: if you are using the `python main.py install` option, you will need to run the command prompt with admin privileges*
@@ -48,7 +48,7 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
 
 1. Open Google Chrome/Brave/Edge/etc. and navigate to `chrome://extensions/`
 2. Enable "Developer mode" in the top right corner
-3. Click "Load unpacked" and select the `Youtubevpplx` directory from the project
+3. Click "Load unpacked" and select the `extension` directory from the project
 4. You can review and change options by clicking on the YoutubeSummarAI extension icon in the Chrome toolbar
 
 ## Usage
@@ -62,19 +62,22 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
 
 The extension's options page allows users to customize various settings:
 
-1. Transcription Method:
+1. Backend URL: This setting specifies the server address for video transcription and processing. By default, it's set to a local server (e.g., http://localhost:5000). You may need to adjust this URL based on your specific setup. To troubleshoot connection issues, check the service log file located at:
+   C:\ProgramData\YouTubeTranscriptionService\youtube_transcription_service.log
+
+2. Transcription Method:
    - Choose between YouTube API or different Whisper models for transcribing video content.
    - Options include YouTube API, Whisper (Base), Whisper (Base English), Whisper (Tiny), etc.
 
-2. Process Locally:
+3. Process Locally:
    - Toggle between processing summaries locally or using an external AI provider.
    - Options: Yes or No
 
-3. AI Provider (when not processing locally):
+4. AI Provider (when not processing locally):
    - Select from various AI providers for summary generation.
    - Options are dynamically populated based on available providers.
 
-4. Provider-specific settings:
+5. Provider-specific settings:
    - Each AI provider has its own set of configurable options:
      - URL: The endpoint for the AI service
      - Input Selector: CSS selector for the input field
