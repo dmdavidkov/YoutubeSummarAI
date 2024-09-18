@@ -72,52 +72,53 @@
             margin-bottom: 10px;
         }
     </style>
-    <script src="constants.js"></script>
     <script src="options.js"></script>
 </head>
 <body>
     <div class="container">
         <h1>YouTube Summary Generator Options</h1>
         
-        <!-- Move the backend URL input to the top -->
-        <label for="backendUrl">Backend URL:</label>
-        <input type="text" id="backendUrl" name="backendUrl">
-        
-        <label for="transcriptionMethod">Transcription Method:</label>
-        <select id="transcriptionMethod">
-            <option value="youtube">YouTube API</option>
-            <option value="whisper:base">Whisper (Base)</option>
-            <option value="whisper:base.en">Whisper (Base English)</option>
-            <option value="whisper:tiny">Whisper (Tiny)</option>
-            <option value="whisper:tiny.en">Whisper (Tiny English)</option>
-            <option value="whisper:small">Whisper (Small)</option>
-            <option value="whisper:small.en">Whisper (Small English)</option>
-            <option value="whisper:medium">Whisper (Medium)</option>
-            <option value="whisper:medium.en">Whisper (Medium English)</option>
-            <option value="whisper:large">Whisper (Large)</option>
-            <option value="whisper:large-v3">Whisper (Large v3)</option>
-        </select>
-
-        <label for="processLocally">Process Locally:</label>
-        <select id="processLocally">
-            <option value="false">No</option>
-            <option value="true">Yes</option>
-        </select>
-
-        <div id="aiProviderSection">
-            <label for="aiProvider">Select AI Provider:</label>
-            <select id="aiProvider">
+        <form id="optionsForm">
+            <!-- Move the backend URL input to the top -->
+            <label for="backendUrl">Backend URL:</label>
+            <input type="text" id="backendUrl" name="backendUrl">
+            
+            <label for="aiProvider">AI Provider:</label>
+            <select id="aiProvider" name="aiProvider">
                 <!-- Options will be dynamically populated -->
             </select>
 
-            <!-- Provider settings will be dynamically generated here -->
-        </div>
+            <label for="transcriptionMethod">Transcription Method:</label>
+            <select id="transcriptionMethod">
+                <option value="youtube">YouTube API</option>
+                <option value="whisper:base">Whisper (Base)</option>
+                <option value="whisper:base.en">Whisper (Base English)</option>
+                <option value="whisper:tiny">Whisper (Tiny)</option>
+                <option value="whisper:tiny.en">Whisper (Tiny English)</option>
+                <option value="whisper:small">Whisper (Small)</option>
+                <option value="whisper:small.en">Whisper (Small English)</option>
+                <option value="whisper:medium">Whisper (Medium)</option>
+                <option value="whisper:medium.en">Whisper (Medium English)</option>
+                <option value="whisper:large">Whisper (Large)</option>
+                <option value="whisper:large-v3">Whisper (Large v3)</option>
+            </select>
 
-        <button id="save">Save</button>
-        <!--<button id="testSelectors">Test Selectors</button> -->
+            <label for="processLocally">Process Locally:</label>
+            <select id="processLocally">
+                <option value="false">No</option>
+                <option value="true">Yes</option>
+            </select>
+
+            <div id="aiProviderSection">
+                <!-- Provider settings will be dynamically generated here -->
+            </div>
+
+            <button type="button" id="saveButton">Save</button>
+        </form>
+        
         <div id="status"></div>
         <div id="selectorStatus"></div>
-        <!-- <p><small>Note: Confirm button and result selectors can only be partially tested.</small></p>
     </div>
+    <script src="options.js"></script>
 </body>
 </html>

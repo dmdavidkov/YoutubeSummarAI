@@ -1,6 +1,3 @@
-YoutubeToText/.env
-YoutubeToText/Meta-Llama-3.1-8B-Instruct-Q6_K_L.gguf
-YoutubeToText/__pycache__/main.cpython-311.pyc
 backend/__pycache__/main.cpython-311.pyc
 backend/.env
 backend/Meta-Llama-3.1-8B-Instruct-Q6_K_L.gguf

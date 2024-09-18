@@ -1,6 +1,66 @@
 // background.js
+// Default settings
+const DEFAULT_SETTINGS = {
+    backendUrl: 'http://localhost:5000',
+    aiProvider: 'you',
+    transcriptionMethod: 'youtube',
+    processLocally: false,
+    providers: {
+        you: {
+            url: 'https://you.com/?chatMode=custom',
+            inputSelector: '#search-input-textarea',
+            buttonSelector: 'button[type="submit"]',
+            confirmButtonSelector: '[data-eventactionname="file_upload_modal_attach"]', 
+            resultSelector: '[data-testid="youchat-answer-turn-0"]'
+        },
+        perplexity: {
+            url: 'https://www.perplexity.ai/',
+            inputSelector: '[placeholder="Ask anything..."]',
+            buttonSelector: '[aria-label="Submit"]',
+            resultSelector: '.prose'
+        },
+        phind: {
+            url: 'https://www.phind.com/',
+            inputSelector: 'div:nth-child(1) > textarea',
+            buttonSelector: 'button:nth-child(7)',
+            resultSelector: '#__next > div > div > div.col-lg-12.sidebar > main > div > div.container-xl > div.row > div.col-12.mt-5 > div:nth-child(1) > div'
+        },
+        gemini: {
+            url: 'https://aistudio.google.com/app/prompts/new_chat',
+            inputSelector: 'body > app-root > div > div > div > div > span > ms-prompt-switcher > ms-chunk-editor > section > footer > div.input-wrapper > div.text-wrapper > ms-chunk-input > section > ms-text-chunk > textarea',
+            buttonSelector: 'body > app-root > div > div > div > div > span > ms-prompt-switcher > ms-chunk-editor > section > footer > div.input-wrapper > div:nth-child(3) > run-button > button',
+            resultSelector: 'ms-chat-turn:nth-child(2) > div > div.prompt-container'
+        },
+        chatgpt: {
+            url: 'https://chatgpt.com',
+            inputSelector: '#prompt-textarea',
+            buttonSelector: '[data-testid="send-button"]',
+            confirmButtonSelector: '',
+            resultSelector: '[data-message-author-role="assistant"]'
+        },
+        custom: {
+            url: '',
+            inputSelector: '',
+            buttonSelector: '',
+            confirmButtonSelector: '',
+            resultSelector: ''
+        }
+    }
+};
 
-// Constants
+// Set default settings on install 
+chrome.runtime.onInstalled.addListener((details) => {
+    if (details.reason === 'install') {
+        chrome.storage.sync.get(Object.keys(DEFAULT_SETTINGS), (items) => {
+            const newSettings = { ...DEFAULT_SETTINGS, ...items };
+            chrome.storage.sync.set(newSettings, () => {
+                console.log('Default settings have been set or updated.');
+            });
+        });
+    }
+});
+
+// Timeout for fetch requests
 const TIMEOUT = 600000; // 10 minutes, for example
 
 // Keep the service worker alive
@@ -41,11 +101,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             handleSelectorWaiting(request);
             break;
         case 'selectorFound':
-            if (waitingTimeout) {
-                clearTimeout(waitingTimeout);
-                waitingTimeout = null;
-            }
-            break;
         case 'contentUpdating':
             if (waitingTimeout) {
                 clearTimeout(waitingTimeout);
@@ -150,8 +205,8 @@ function generateSummary(videoUrl) {
     sendMessageToContent({ action: 'updateSummaryStatus', status: 'Generating transcript...' }, true, false);
 
     chrome.storage.sync.get(['transcriptionMethod', 'processLocally'], function(items) {
-        const transcriptionMethod = items.transcriptionMethod || 'whisper';
-        const processLocally = items.processLocally || false;
+        const transcriptionMethod = items.transcriptionMethod;
+        const processLocally = items.processLocally;
         
         const controller = new AbortController();
         const fetchPromise = createFetchPromise(videoUrl, controller, transcriptionMethod, processLocally);
@@ -191,7 +246,7 @@ function generateSummary(videoUrl) {
 function createFetchPromise(videoUrl, controller, transcriptionMethod, processLocally) {
     return new Promise((resolve, reject) => {
         chrome.storage.sync.get(['backendUrl'], function(items) {
-            const backendUrl = items.backendUrl || DEFAULT_BACKEND_URL;
+            const backendUrl = items.backendUrl;
             
             let body = { 
                 url: videoUrl, 
@@ -237,10 +292,8 @@ function setupKeepAliveInterval(fetchPromise) {
 // Open AI provider and paste prompt
 function openAIProviderAndPastePrompt(prompt, videoUrl) {
     chrome.storage.sync.get(['aiProvider', 'providers'], function(items) {
-        const provider = items.aiProvider || DEFAULT_AI_PROVIDER;
-        const providerSettings = items.providers && items.providers[provider] 
-            ? items.providers[provider] 
-            : DEFAULT_PROVIDER_SETTINGS[provider];
+        const provider = items.aiProvider;
+        const providerSettings = items.providers[provider];
         
         chrome.windows.getCurrent({}, (currentWindow) => {
             const width = 10;

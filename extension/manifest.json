@@ -32,12 +32,12 @@
         "https://aistudio.google.com/*",
         "https://chatgpt.com/*"
       ],
-      "js": ["constants.js", "marked.js", "content.js"]
+      "js": ["marked.js", "content.js"]
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["popup.html", "marked.js", "constants.js"],
+      "resources": ["popup.html", "marked.js"],
       "matches": ["<all_urls>"]
     }
   ],

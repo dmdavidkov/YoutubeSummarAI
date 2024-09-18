@@ -1,21 +1,62 @@
-document.addEventListener('DOMContentLoaded', initializeOptions);
+// Declare variables to hold the settings
+let settings;
+
+// Retrieve settings from storage
+chrome.storage.sync.get(null, (items) => {
+    // Use the settings from storage
+    settings = {
+        backendUrl: items.backendUrl || '',
+        aiProvider: items.aiProvider || '',
+        transcriptionMethod: items.transcriptionMethod || '',
+        processLocally: items.processLocally || false,
+        providers: items.providers || {}
+    };
+
+    // Call initializeOptions after retrieving the settings
+    initializeOptions();
+});
 
 function initializeOptions() {
-    restoreOptions();
-    document.getElementById('save').addEventListener('click', saveOptions);
-    document.getElementById('aiProvider').addEventListener('change', handleProviderChange);
-    document.getElementById('processLocally').addEventListener('change', handleProcessLocallyChange);
-    // document.getElementById('testSelectors').addEventListener('click', testSelectors);
-    
-    // Dynamically generate provider settings
+    const backendUrlInput = document.getElementById('backendUrl');
+    const aiProviderSelect = document.getElementById('aiProvider');
+    const transcriptionMethodSelect = document.getElementById('transcriptionMethod');
+    const processLocallySelect = document.getElementById('processLocally');
+
+    // Check if elements exist before setting values
+    if (backendUrlInput) backendUrlInput.value = settings.backendUrl || '';
+    if (aiProviderSelect) aiProviderSelect.value = settings.aiProvider || '';
+    if (transcriptionMethodSelect) transcriptionMethodSelect.value = settings.transcriptionMethod || '';
+    if (processLocallySelect) processLocallySelect.value = settings.processLocally.toString();
+
+    // Generate provider settings
     generateProviderSettings();
+
+    // Add event listeners for form submission and changes
+    const saveButton = document.getElementById('saveButton');
+    if (saveButton) saveButton.addEventListener('click', saveOptions);
+    if (aiProviderSelect) aiProviderSelect.addEventListener('change', handleProviderChange);
+    if (processLocallySelect) processLocallySelect.addEventListener('change', handleProcessLocallyChange);
+
+    // Initial toggle of provider fields
+    handleProviderChange();
+    handleProcessLocallyChange();
 }
 
 function generateProviderSettings() {
     const aiProviderSelect = document.getElementById('aiProvider');
     const aiProviderSection = document.getElementById('aiProviderSection');
 
-    for (const provider in DEFAULT_PROVIDER_SETTINGS) {
+    // Clear existing options and settings
+    aiProviderSelect.innerHTML = '';
+    aiProviderSection.innerHTML = '';
+
+    // Add a default option
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = 'Select a provider';
+    aiProviderSelect.appendChild(defaultOption);
+
+    for (const provider in settings.providers) {
         // Add option to select
         const option = document.createElement('option');
         option.value = provider;
@@ -46,16 +87,19 @@ function generateProviderSettings() {
 }
 
 function handleProviderChange() {
-    showProviderSettings(this.value);
+    const aiProvider = document.getElementById('aiProvider').value;
+    showProviderSettings(aiProvider);
 }
 
 function showProviderSettings(provider) {
-    document.querySelectorAll('.provider-settings').forEach(el => el.classList.remove('active'));
-    const providerSettings = document.getElementById(`${provider}Settings`);
-    if (providerSettings) {
-        providerSettings.classList.add('active');
-    } else {
-        console.error(`Provider settings not found for ${provider}`);
+    document.querySelectorAll('.provider-settings').forEach(el => el.style.display = 'none');
+    if (provider) {
+        const providerSettings = document.getElementById(`${provider}Settings`);
+        if (providerSettings) {
+            providerSettings.style.display = 'block';
+        } else {
+            console.warn(`Provider settings not found for ${provider}`);
+        }
     }
 }
 
@@ -67,8 +111,9 @@ function handleProcessLocallyChange() {
 
 // Load saved options
 chrome.storage.sync.get(['aiProvider', 'providers'], function(items) {
-    if (items.aiProvider) {
-        document.getElementById('aiProvider').value = items.aiProvider;
+    const aiProviderElement = document.getElementById('aiProvider');
+    if (aiProviderElement && items.aiProvider) {
+        aiProviderElement.value = items.aiProvider;
         showProviderSettings(items.aiProvider);
     }
 
@@ -76,7 +121,10 @@ chrome.storage.sync.get(['aiProvider', 'providers'], function(items) {
         for (const provider in items.providers) {
             for (const setting in items.providers[provider]) {
                 const inputId = `${provider}${capitalizeFirstLetter(setting)}`;
-                document.getElementById(inputId).value = items.providers[provider][setting];
+                const element = document.getElementById(inputId);
+                if (element) {
+                    element.value = items.providers[provider][setting];
+                }
             }
         }
     }
@@ -89,45 +137,30 @@ function saveOptions() {
     const processLocally = document.getElementById('processLocally')?.value === 'true';
     const backendUrl = document.getElementById('backendUrl').value;
 
-    if (!aiProvider || !transcriptionMethod) {
+    if (!transcriptionMethod) {
         console.error('Required elements not found');
         return;
     }
 
-    const settings = {
+    const newSettings = {
+        aiProvider: aiProvider,
         transcriptionMethod: transcriptionMethod,
         processLocally: processLocally,
-        backendUrl: backendUrl
+        backendUrl: backendUrl,
+        providers: {}
     };
 
-    if (!processLocally) {
-        settings.aiProvider = aiProvider;
-        settings.providers = {};
-
-        for (const provider in DEFAULT_PROVIDER_SETTINGS) {
-            settings.providers[provider] = {};
-            for (const setting in DEFAULT_PROVIDER_SETTINGS[provider]) {
-                const value = document.getElementById(`${provider}${capitalizeFirstLetter(setting)}`)?.value;
-                if (value) {
-                    settings.providers[provider][setting] = value;
-                }
+    for (const provider in settings.providers) {
+        newSettings.providers[provider] = {};
+        for (const setting in settings.providers[provider]) {
+            const value = document.getElementById(`${provider}${capitalizeFirstLetter(setting)}`)?.value;
+            if (value !== undefined) {
+                newSettings.providers[provider][setting] = value;
             }
-            // Always save confirmButtonSelector, even if it's empty
-            const confirmButtonSelector = document.getElementById(`${provider}ConfirmButtonSelector`)?.value;
-            settings.providers[provider].confirmButtonSelector = confirmButtonSelector;
         }
-
-        // Save custom provider settings
-        settings.providers.custom = {
-            url: document.getElementById('customUrl')?.value,
-            inputSelector: document.getElementById('customInputSelector')?.value,
-            buttonSelector: document.getElementById('customButtonSelector')?.value,
-            confirmButtonSelector: document.getElementById('customConfirmButtonSelector')?.value,
-            resultSelector: document.getElementById('customResultSelector')?.value
-        };
     }
 
-    chrome.storage.sync.set(settings, () => {
+    chrome.storage.sync.set(newSettings, () => {
         const status = document.getElementById('status');
         if (status) {
             status.textContent = 'Options saved.';
@@ -136,64 +169,49 @@ function saveOptions() {
             }, 3000);
         }
     });
-
-    // Remove the automatic testing of selectors
-    // testSelectors();
 }
 
 // Restores select box state using the preferences stored in chrome.storage.
 function restoreOptions() {
-    chrome.storage.sync.get({
-        aiProvider: DEFAULT_AI_PROVIDER,
-        providers: DEFAULT_PROVIDER_SETTINGS,
-        transcriptionMethod: DEFAULT_TRANSCRIPTION_METHOD,
-        processLocally: DEFAULT_PROCESS_LOCALLY,
-        backendUrl: DEFAULT_BACKEND_URL
-    }, (items) => {
-        if (items.processLocally !== undefined) {
-            document.getElementById('processLocally').value = items.processLocally.toString();
+    chrome.storage.sync.get(null, (items) => {
+        const processLocallyElement = document.getElementById('processLocally');
+        if (processLocallyElement) {
+            processLocallyElement.value = (items.processLocally || false).toString();
             handleProcessLocallyChange();
-        } else {
-            document.getElementById('processLocally').value = DEFAULT_PROCESS_LOCALLY.toString();
         }
 
-        if (items.aiProvider) {
-            document.getElementById('aiProvider').value = items.aiProvider;
-            showProviderSettings(items.aiProvider);
-        } else {
-            showProviderSettings(DEFAULT_AI_PROVIDER);
+        const aiProviderElement = document.getElementById('aiProvider');
+        if (aiProviderElement) {
+            aiProviderElement.value = items.aiProvider || '';
+            handleProviderChange(); // Show the correct provider settings
         }
 
-        const providers = items.providers || DEFAULT_PROVIDER_SETTINGS;
+        const providers = items.providers || {};
         for (const provider in providers) {
             for (const setting in providers[provider]) {
                 const inputId = `${provider}${capitalizeFirstLetter(setting)}`;
                 const element = document.getElementById(inputId);
                 if (element) {
-                    element.value = providers[provider][setting];
+                    element.value = providers[provider][setting] || '';
                 }
             }
             // Always restore confirmButtonSelector, even if it's undefined
             const confirmButtonSelector = providers[provider].confirmButtonSelector;
-            document.getElementById(`${provider}ConfirmButtonSelector`).value = confirmButtonSelector || '';
+            const confirmButtonElement = document.getElementById(`${provider}ConfirmButtonSelector`);
+            if (confirmButtonElement) {
+                confirmButtonElement.value = confirmButtonSelector || '';
+            }
         }
 
-        // Restore custom provider settings if they exist
-        if (providers.custom) {
-            document.getElementById('customUrl').value = providers.custom.url || '';
-            document.getElementById('customInputSelector').value = providers.custom.inputSelector || '';
-            document.getElementById('customButtonSelector').value = providers.custom.buttonSelector || '';
-            document.getElementById('customConfirmButtonSelector').value = providers.custom.confirmButtonSelector || '';
-            document.getElementById('customResultSelector').value = providers.custom.resultSelector || '';
+        const transcriptionMethodElement = document.getElementById('transcriptionMethod');
+        if (transcriptionMethodElement) {
+            transcriptionMethodElement.value = items.transcriptionMethod || '';
         }
 
-        if (items.transcriptionMethod) {
-            document.getElementById('transcriptionMethod').value = items.transcriptionMethod;
-        } else {
-            document.getElementById('transcriptionMethod').value = DEFAULT_TRANSCRIPTION_METHOD;
+        const backendUrlElement = document.getElementById('backendUrl');
+        if (backendUrlElement) {
+            backendUrlElement.value = items.backendUrl || '';
         }
-
-        document.getElementById('backendUrl').value = items.backendUrl || DEFAULT_BACKEND_URL;
     });
 }
 
@@ -201,109 +219,10 @@ function capitalizeFirstLetter(string) {
     return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
-function testSelectors() {
-    const aiProvider = document.getElementById('aiProvider').value;
-    const providerSettings = {};
-    
-    ['url', 'inputSelector', 'buttonSelector', 'confirmButtonSelector', 'resultSelector'].forEach(setting => {
-        const inputId = `${aiProvider}${capitalizeFirstLetter(setting)}`;
-        providerSettings[setting] = document.getElementById(inputId).value;
+// Add event listeners when the DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    chrome.storage.sync.get(null, (items) => {
+        settings = items;
+        restoreOptions();
     });
-
-    chrome.tabs.create({ url: providerSettings.url, active: false }, (tab) => {
-        // Wait for the page to load before running the test
-        chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
-            if (tabId === tab.id && info.status === 'complete') {
-                chrome.tabs.onUpdated.removeListener(listener);
-                
-                chrome.scripting.executeScript({
-                    target: { tabId: tab.id },
-                    function: testSelectorsOnPage,
-                    args: [providerSettings]
-                }, (results) => {
-                    if (chrome.runtime.lastError) {
-                        console.error(chrome.runtime.lastError);
-                        updateSelectorStatus('Error testing selectors', true);
-                    } else {
-                        const result = results[0].result;
-                        updateSelectorStatus(result.message, result.hasError);
-                    }
-                    // Close the tab after 2 seconds
-                    setTimeout(() => chrome.tabs.remove(tab.id), 2000);
-                });
-            }
-        });
-    });
-}
-
-function testSelectorsOnPage(settings) {
-    const results = {
-        urlValid: false,
-        inputSelector: false,
-        buttonSelector: false,
-        confirmButtonSelector: true, // Assume true initially
-        resultSelector: true // Assume true initially
-    };
-
-    const messages = [];
-
-    // Validate URL
-    const expectedHostname = new URL(settings.url).hostname;
-    if (window.location.hostname !== expectedHostname) {
-        messages.push(`Unexpected page loaded. Expected ${expectedHostname}, got ${window.location.hostname}`);
-    } else {
-        results.urlValid = true;
-    }
-
-    // Test input selector
-    const inputElement = document.querySelector(settings.inputSelector);
-    if (inputElement) {
-        results.inputSelector = true;
-    } else {
-        messages.push("Input selector not found");
-    }
-
-    // Test button selector
-    const buttonElement = document.querySelector(settings.buttonSelector);
-    if (buttonElement) {
-        results.buttonSelector = true;
-    } else {
-        messages.push("Button selector not found");
-    }
-
-    // For confirm button selector, consider it valid if it's empty or a valid selector
-    if (settings.confirmButtonSelector && settings.confirmButtonSelector.trim() !== '') {
-        try {
-            document.querySelector(settings.confirmButtonSelector);
-        } catch (e) {
-            results.confirmButtonSelector = false;
-            messages.push("Confirm button selector is invalid");
-        }
-    }
-
-    // Test result selector
-    try {
-        document.querySelector(settings.resultSelector);
-    } catch (e) {
-        results.resultSelector = false;
-        messages.push("Result selector is invalid");
-    }
-
-    if (messages.length === 0) {
-        return { 
-            message: 'All selectors appear to be valid. Note: Confirm button and result selectors could not be fully tested.',
-            hasError: false 
-        };
-    } else {
-        return {
-            message: `The following issues were found: ${messages.join(', ')}. Please update the selectors.`,
-            hasError: true
-        };
-    }
-}
-
-function updateSelectorStatus(message, isError) {
-    const statusElement = document.getElementById('selectorStatus');
-    statusElement.textContent = message;
-    statusElement.style.color = isError ? 'red' : 'green';
-}
+});
