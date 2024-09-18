@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube Video Summary Generator",
+  "version": "1.0",
+  "description": "Generates a summary of a YouTube video using AI.",
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  },
+  "permissions": [
+    "alarms",
+    "activeTab",
+    "tabs",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {},
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.youtube.com/*",
+        "https://you.com/*",
+        "https://www.perplexity.ai/*",
+        "https://www.phind.com/*",
+        "https://aistudio.google.com/*",
+        "https://chatgpt.com/*"
+      ],
+      "js": ["constants.js", "marked.js", "content.js"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["popup.html", "marked.js", "constants.js"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "options_page": "options.html"
+}

@@ -1,0 +1,37 @@
+# Web framework
+flask
+
+# YouTube video download
+yt-dlp
+
+# Environment variables
+python-dotenv
+
+# Logging
+pywin32
+
+# Audio processing and transcription
+whisperx
+
+# API requests
+requests
+
+# Clipboard operations
+pyperclip
+
+# Data processing
+numpy
+pandas
+
+# Machine learning
+torch
+transformers
+
+# API
+google-api-python-client
+
+# Misc utilities
+uuid
+
+# Jinja2
+jinja2

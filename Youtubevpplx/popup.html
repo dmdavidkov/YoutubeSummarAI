@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Summary with Phind</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background-color: #0F0F0F;
+      font-family: 'Roboto', sans-serif;
+      color: #fff;
+      width: 35vw;
+      min-width: 350px;
+      max-width: 600px;
+      font-size: 18px;
+    }
+    #generateSummaryBtn {
+      padding: 12px 24px;
+      font-size: 20px;
+      background-color: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 30px;
+      cursor: pointer;
+      transition: background-color 0.3s ease, transform 0.3s ease;
+      display: block;
+      margin: 0 auto 30px;
+    }
+    #generateSummaryBtn:hover {
+      background-color: #0056b3;
+      transform: scale(1.05);
+    }
+    #summary {
+      font-size: 18px;
+      line-height: 1.6;
+    }
+    #summary h1 {
+      font-size: 2.5rem;
+      font-weight: 600;
+      line-height: 2.7rem;
+      margin-top: 30px;
+      margin-bottom: 15px;
+      border-bottom: 2px solid #007bff;
+      padding-bottom: 10px;
+    }
+    #summary h2 {
+      font-size: 2.2rem;
+      font-weight: 600;
+      line-height: 2.4rem;
+      margin-top: 25px;
+      margin-bottom: 10px;
+    }
+    #summary h3 {
+      font-size: 1.9rem;
+      font-weight: 600;
+      line-height: 2.1rem;
+      margin-top: 20px;
+      margin-bottom: 10px;
+    }
+    #summary p, #summary ul, #summary ol {
+      margin-bottom: 15px;
+    }
+    #summary ul, #summary ol {
+      padding-left: 40px;
+    }
+    #summary li {
+      margin-bottom: 8px;
+    }
+    #summary a {
+      color: #007bff;
+      text-decoration: none;
+    }
+    #summary a:hover {
+      text-decoration: underline;
+    }
+    .timestamp {
+      font-weight: bold;
+      color: #007bff;
+      background-color: rgba(0, 123, 255, 0.1);
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-right: 5px;
+      transition: background-color 0.3s ease;
+    }
+    .timestamp:hover {
+      background-color: rgba(0, 123, 255, 0.2);
+    }
+    .key-point {
+      background-color: rgba(0, 123, 255, 0.1);
+      border-left: 3px solid #007bff;
+      padding: 10px;
+      margin-bottom: 15px;
+    }
+    blockquote {
+      margin: 0 0 15px;
+      padding: 10px 20px;
+      background-color: rgba(255, 255, 255, 0.1);
+      border-left: 5px solid #007bff;
+      font-style: italic;
+    }
+    .error {
+      color: #ff0000;
+      font-weight: bold;
+    }
+    .loading {
+      color: #007bff;
+      font-style: italic;
+    }
+    .anchor-link {
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      margin-left: 10px;
+      font-size: 0.8em;
+    }
+    h1:hover .anchor-link,
+    h2:hover .anchor-link,
+    h3:hover .anchor-link {
+      opacity: 1;
+    }
+    .hidden {
+      display: none !important;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+  <button id="generateSummaryBtn">Generate Summary</button>
+  <div id="summary">
+    <!-- Summary content will be inserted here -->
+  </div>
+  <!-- Removed script reference to popup.js -->
+</body>
+</html>
