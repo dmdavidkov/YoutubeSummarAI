@@ -5,6 +5,7 @@ const DEFAULT_SETTINGS = {
     aiProvider: 'you',
     transcriptionMethod: 'youtube',
     processLocally: false,
+    logConversations: false,  // Default value set to false
     providers: {
         you: {
             url: 'https://you.com/?chatMode=custom',
@@ -53,6 +54,7 @@ chrome.runtime.onInstalled.addListener((details) => {
     if (details.reason === 'install') {
         chrome.storage.sync.get(Object.keys(DEFAULT_SETTINGS), (items) => {
             const newSettings = { ...DEFAULT_SETTINGS, ...items };
+
             chrome.storage.sync.set(newSettings, () => {
                 console.log('Default settings have been set or updated.');
             });
@@ -85,7 +87,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             forwardMessageToYouTubeTabs(request);
             break;
         case 'closeTab':
-            closeNewTab();
+            closeNewTab(request.prompt, request.clipboard);
             break;
         case 'seekToTimeEx':
             seekToTimeInYouTubeTab(request.time);
@@ -164,12 +166,44 @@ function forwardMessageToYouTubeTabs(message) {
     });
 }
 
-// Close the new tab
-function closeNewTab() {
+// Updated closeNewTab function
+function closeNewTab(prompt, clipboard) {
     if (newTabId !== null) {
-        chrome.tabs.remove(newTabId);
-        newTabId = null;
+        console.log("Closing tab with ID:", newTabId);
+        chrome.tabs.remove(newTabId, () => {
+            if (chrome.runtime.lastError) {
+                console.error('Error closing tab:', chrome.runtime.lastError);
+            } else {
+                console.log('Tab closed successfully.');
+                newTabId = null;
+            }
+        });
+    } else {
+        console.warn("No tab ID to close.");
     }
+
+    // Check if logging conversations is enabled before saving the result
+    chrome.storage.sync.get(['backendUrl', 'logConversations'], function(items) {
+        const backendUrl = items.backendUrl;
+        const logConversations = items.logConversations;
+        
+        if (logConversations) {
+            fetch(`${backendUrl}/save_result`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: prompt, result: clipboard })
+            }).then(response => {
+                if (!response.ok) throw new Error('Network response was not ok');
+                return response.json();
+            }).then(data => {
+                console.log('Result saved successfully:', data);
+            }).catch(error => {
+                console.error('Error saving result:', error);
+            });
+        } else {
+            console.log('Logging conversations is disabled. Result not saved.');
+        }
+    });
 }
 
 // Seek to time in YouTube tab

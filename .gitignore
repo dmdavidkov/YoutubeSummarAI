@@ -1,3 +1,8 @@
 backend/__pycache__/main.cpython-311.pyc
 backend/.env
 *.gguf
+backend/prompt_template copy.txt
+backend/generated_prompts_and_results.csv
+backend/prompt_template3.txt
+backend/prompt_template1.txt
+backend/prompt_template4.txt

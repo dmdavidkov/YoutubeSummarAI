@@ -13,6 +13,7 @@
     let providerSettings = {};
     let currentObserver = null;
     let dockedDiv = null;
+    let globalPrompt = '';
 
     // Load settings from storage
     chrome.storage.sync.get(null, function(items) {
@@ -357,14 +358,37 @@
     function resetTimer() {
         clearTimeout(timeoutId);
         timeoutId = setTimeout(() => {
-            chrome.runtime.sendMessage({ action: 'closeTab' });
+
+            // Click the copy button if it exists
+            // TODO: make this work for other providers via providerSettings
+            const copyButton = document.querySelector('[data-testid="copy-button"]');
+            if (copyButton) {
+                console.log("Copy button found, clicking it");
+                copyButton.click();
+            } else {
+                console.log("Copy button not found");
+            }
+            sendCloseTabMessage();
+            // chrome.runtime.sendMessage({ action: 'closeTab' });
             console.log("closeTab message sent");
             if (currentObserver) {
                 currentObserver.disconnect();
             }
         }, 6000); // 6 seconds
     }
-
+    async function sendCloseTabMessage() {
+        try {
+            const clipboardText = await navigator.clipboard.readText();
+            chrome.runtime.sendMessage({ 
+                action: 'closeTab', 
+                prompt: globalPrompt, 
+                clipboard: clipboardText 
+            });
+            console.log("closeTab message sent");
+        } catch (error) {
+            console.error("Failed to read clipboard contents:", error);
+        }
+    }
     function handlePastePrompt(request) {
         const provider = request.provider;
         const selectors = request.selectors;
@@ -373,13 +397,18 @@
         
         waitForInputField(selectors.inputSelector, element => {
             console.log("Input element found");
+            
+            // 2. Assign request.prompt to the global variable
+            globalPrompt = request.prompt;
+            
             if (element.tagName.toLowerCase() === 'input' || element.tagName.toLowerCase() === 'textarea') {
-                element.value = request.prompt;
+                // 3. Use the global variable instead of request.prompt
+                element.value = globalPrompt;
                 element.dispatchEvent(new Event('input', { bubbles: true }));
             } else if (element.isContentEditable) {
-                element.textContent = request.prompt;
+                element.textContent = globalPrompt;
                 if (element.innerHTML !== undefined) {
-                    element.innerHTML = request.prompt;
+                    element.innerHTML = globalPrompt;
                 }
                 element.dispatchEvent(new Event('input', { bubbles: true }));
                 element.dispatchEvent(new Event('change', { bubbles: true }));
@@ -389,9 +418,9 @@
             
             // Add a 1-second delay before executing handleButtonClicks
             setTimeout(() => {
-              handleButtonClicks(selectors);
-          }, 1000);        
-    });
+                handleButtonClicks(selectors);
+            }, 1000);        
+        });
     }
 
     function waitForInputField(selector, callback) {

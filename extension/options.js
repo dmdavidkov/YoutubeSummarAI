@@ -3,30 +3,52 @@ let settings;
 
 // Retrieve settings from storage
 chrome.storage.sync.get(null, (items) => {
+    console.log("Retrieved settings from storage:", items);
     // Use the settings from storage
     settings = {
         backendUrl: items.backendUrl || '',
         aiProvider: items.aiProvider || '',
         transcriptionMethod: items.transcriptionMethod || '',
         processLocally: items.processLocally || false,
+        logConversations: items.logConversations || false,
         providers: items.providers || {}
     };
+
+    console.log("Initialized settings:", settings);
 
     // Call initializeOptions after retrieving the settings
     initializeOptions();
 });
 
 function initializeOptions() {
+    console.log("Initializing options");
     const backendUrlInput = document.getElementById('backendUrl');
     const aiProviderSelect = document.getElementById('aiProvider');
     const transcriptionMethodSelect = document.getElementById('transcriptionMethod');
     const processLocallySelect = document.getElementById('processLocally');
+    const logConversationsSelect = document.getElementById('logConversations');
 
     // Check if elements exist before setting values
-    if (backendUrlInput) backendUrlInput.value = settings.backendUrl || '';
-    if (aiProviderSelect) aiProviderSelect.value = settings.aiProvider || '';
-    if (transcriptionMethodSelect) transcriptionMethodSelect.value = settings.transcriptionMethod || '';
-    if (processLocallySelect) processLocallySelect.value = settings.processLocally.toString();
+    if (backendUrlInput) {
+        backendUrlInput.value = settings.backendUrl || '';
+        console.log("Set backendUrl:", backendUrlInput.value);
+    }
+    if (aiProviderSelect) {
+        aiProviderSelect.value = settings.aiProvider || '';
+        console.log("Set aiProvider:", aiProviderSelect.value);
+    }
+    if (transcriptionMethodSelect) {
+        transcriptionMethodSelect.value = settings.transcriptionMethod || '';
+        console.log("Set transcriptionMethod:", transcriptionMethodSelect.value);
+    }
+    if (processLocallySelect) {
+        processLocallySelect.value = settings.processLocally.toString();
+        console.log("Set processLocally:", processLocallySelect.value);
+    }
+    if (logConversationsSelect) {
+        logConversationsSelect.value = settings.logConversations.toString();
+        console.log("Set logConversations:", logConversationsSelect.value);
+    }
 
     // Generate provider settings
     generateProviderSettings();
@@ -109,44 +131,61 @@ function handleProcessLocallyChange() {
     aiProviderSection.style.display = processLocally ? 'none' : 'block';
 }
 
-// Load saved options
-chrome.storage.sync.get(['aiProvider', 'providers'], function(items) {
-    const aiProviderElement = document.getElementById('aiProvider');
-    if (aiProviderElement && items.aiProvider) {
-        aiProviderElement.value = items.aiProvider;
-        showProviderSettings(items.aiProvider);
-    }
+function restoreOptions() {
+    console.log("Restoring options");
+    chrome.storage.sync.get(null, function(items) {
+        console.log("Retrieved items for restoring:", items);
+        const aiProviderElement = document.getElementById('aiProvider');
+        if (aiProviderElement && items.aiProvider) {
+            aiProviderElement.value = items.aiProvider;
+            showProviderSettings(items.aiProvider);
+            console.log("Restored aiProvider:", items.aiProvider);
+        }
 
-    if (items.providers) {
-        for (const provider in items.providers) {
-            for (const setting in items.providers[provider]) {
-                const inputId = `${provider}${capitalizeFirstLetter(setting)}`;
-                const element = document.getElementById(inputId);
-                if (element) {
-                    element.value = items.providers[provider][setting];
+        if (items.providers) {
+            for (const provider in items.providers) {
+                for (const setting in items.providers[provider]) {
+                    const inputId = `${provider}${capitalizeFirstLetter(setting)}`;
+                    const element = document.getElementById(inputId);
+                    if (element) {
+                        element.value = items.providers[provider][setting];
+                        console.log(`Restored ${provider} ${setting}:`, element.value);
+                    }
                 }
             }
         }
-    }
-});
+
+        // Set values for other fields
+        const fields = ['backendUrl', 'processLocally', 'logConversations'];
+        fields.forEach(field => {
+            const element = document.getElementById(field);
+            if (element) {
+                if (element.tagName === 'SELECT') {
+                    element.value = items[field] === true ? 'true' : 'false';
+                } else {
+                    element.value = items[field] || '';
+                }
+                console.log(`Restored ${field}:`, element.value);
+            }
+        });
+
+        // Handle transcriptionMethod separately
+        const transcriptionMethodElement = document.getElementById('transcriptionMethod');
+        if (transcriptionMethodElement) {
+            transcriptionMethodElement.value = items.transcriptionMethod || '';
+            console.log(`Restored transcriptionMethod:`, transcriptionMethodElement.value);
+        }
+    });
+}
 
 // Saves options to chrome.storage
 function saveOptions() {
-    const aiProvider = document.getElementById('aiProvider')?.value;
-    const transcriptionMethod = document.getElementById('transcriptionMethod')?.value;
-    const processLocally = document.getElementById('processLocally')?.value === 'true';
-    const backendUrl = document.getElementById('backendUrl').value;
-
-    if (!transcriptionMethod) {
-        console.error('Required elements not found');
-        return;
-    }
-
     const newSettings = {
-        aiProvider: aiProvider,
-        transcriptionMethod: transcriptionMethod,
-        processLocally: processLocally,
-        backendUrl: backendUrl,
+        aiProvider: document.getElementById('aiProvider')?.value,
+        transcriptionMethod: document.getElementById('transcriptionMethod')?.value,
+        processLocally: document.getElementById('processLocally')?.value === 'true',
+        logConversations: document.getElementById('logConversations')?.value === 'true',
+        backendUrl: document.getElementById('backendUrl')?.value,
         providers: {}
     };
 
@@ -171,58 +210,13 @@ function saveOptions() {
     });
 }
 
-// Restores select box state using the preferences stored in chrome.storage.
-function restoreOptions() {
-    chrome.storage.sync.get(null, (items) => {
-        const processLocallyElement = document.getElementById('processLocally');
-        if (processLocallyElement) {
-            processLocallyElement.value = (items.processLocally || false).toString();
-            handleProcessLocallyChange();
-        }
-
-        const aiProviderElement = document.getElementById('aiProvider');
-        if (aiProviderElement) {
-            aiProviderElement.value = items.aiProvider || '';
-            handleProviderChange(); // Show the correct provider settings
-        }
-
-        const providers = items.providers || {};
-        for (const provider in providers) {
-            for (const setting in providers[provider]) {
-                const inputId = `${provider}${capitalizeFirstLetter(setting)}`;
-                const element = document.getElementById(inputId);
-                if (element) {
-                    element.value = providers[provider][setting] || '';
-                }
-            }
-            // Always restore confirmButtonSelector, even if it's undefined
-            const confirmButtonSelector = providers[provider].confirmButtonSelector;
-            const confirmButtonElement = document.getElementById(`${provider}ConfirmButtonSelector`);
-            if (confirmButtonElement) {
-                confirmButtonElement.value = confirmButtonSelector || '';
-            }
-        }
-
-        const transcriptionMethodElement = document.getElementById('transcriptionMethod');
-        if (transcriptionMethodElement) {
-            transcriptionMethodElement.value = items.transcriptionMethod || '';
-        }
-
-        const backendUrlElement = document.getElementById('backendUrl');
-        if (backendUrlElement) {
-            backendUrlElement.value = items.backendUrl || '';
-        }
-    });
-}
-
 function capitalizeFirstLetter(string) {
     return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
 // Add event listeners when the DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    chrome.storage.sync.get(null, (items) => {
-        settings = items;
-        restoreOptions();
-    });
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("DOM content loaded");
+    restoreOptions();
+    document.getElementById('saveButton')?.addEventListener('click', saveOptions);
 });

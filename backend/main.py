@@ -25,6 +25,10 @@ import subprocess
 import numpy as np
 import codecs
 import socket
+import tempfile
+import jinja2
+import csv
+import io
 
 # Set up logging
 log_dir = os.path.join(os.environ['PROGRAMDATA'], 'YouTubeTranscriptionService')
@@ -66,16 +70,38 @@ diarize_model = None
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 def load_models(model_name="base"):
-    global whisper_model, align_model, align_metadata, diarize_model, device, whisper_model_name
+    global align_model, align_metadata, diarize_model, device, whisper_model_name
     logger.info(f"Using device: {device}")
-    logger.info(f"Loading WhisperX model: {model_name}")
-    whisper_model = whisperx.load_model(model_name, device, compute_type="int8" if device == "cuda" else "float32")
     whisper_model_name = model_name
+    logger.info("Models will be loaded when needed")
+
+def load_whisper_model():
+    global whisper_model, device, whisper_model_name
+    logger.info(f"Loading WhisperX model: {whisper_model_name}")
+    whisper_model = whisperx.load_model(whisper_model_name, device, compute_type="int8" if device == "cuda" else "float32")
+    logger.info("Whisper model loaded successfully")
+
+def load_align_model():
+    global align_model, align_metadata, device
     logger.info("Loading alignment model...")
     align_model, align_metadata = whisperx.load_align_model(language_code="en", device=device)
+    logger.info("Alignment model loaded successfully")
+
+def load_diarize_model():
+    global diarize_model, device
     logger.info("Loading diarization model...")
     diarize_model = whisperx.DiarizationPipeline(use_auth_token=hf_auth_token, device=device)
-    logger.info("All models loaded successfully")
+    logger.info("Diarization model loaded successfully")
+
+def unload_models():
+    global whisper_model, align_model, align_metadata, diarize_model
+    whisper_model = None
+    align_model = None
+    align_metadata = None
+    diarize_model = None
+    if device == "cuda":
+        torch.cuda.empty_cache()
+    logger.info("All models unloaded and GPU memory cleared")
 
 def download_youtube_audio(url, output_path='.'):
     logger.info(f"Downloading audio from URL: {url}")
@@ -118,11 +144,14 @@ def transcribe_audio(audio_path, video_details):
     start_time = time.time()
     
     try:
+        load_whisper_model()
         result = whisper_model.transcribe(audio_path, batch_size=16 if device == "cuda" else 1, language=video_details.get('language', 'en'))
+        
         if result["language"] == 'en':
+            load_align_model()
             result = whisperx.align(result["segments"], align_model, align_metadata, audio_path, device, return_char_alignments=False)
 
-        # 3. Assign speaker labels
+        load_diarize_model()
         diarize_segments = diarize_model(audio_path)
         result = whisperx.assign_word_speakers(diarize_segments, result)
         
@@ -138,16 +167,15 @@ def transcribe_audio(audio_path, video_details):
             text = segment["text"]
             speaker = segment.get("speaker") if isinstance(segment, dict) else None
             transcription += f"[{start_time} - {end_time}] {speaker}: {text}\n"
-           
-        # Clear GPU memory
-        if device == "cuda":
-            torch.cuda.empty_cache()
-            logger.info("GPU memory cleared after transcription")
+        
+        unload_models()
+        
         return transcription
     
     except Exception as e:
         logger.error(f"Error during transcription: {e}")
         traceback.print_exc()
+        unload_models()
         return None
     
 def format_timestamp(seconds):
@@ -157,7 +185,7 @@ def format_timestamp(seconds):
 
 @app.route('/transcribe', methods=['POST'])
 def transcribe():
-    global last_response_cache, whisper_model, whisper_model_name
+    global last_response_cache, whisper_model_name
     
     logger.info("Received transcription request")
     
@@ -195,8 +223,8 @@ def transcribe():
     if transcription_method == 'whisper':
         whisper_model_requested = request.json.get('whisperModel', 'base')
         if whisper_model_requested != whisper_model_name:
-            logger.info(f"Requested Whisper model '{whisper_model_requested}' differs from loaded model '{whisper_model_name}'. Reloading...")
-            load_models(whisper_model_requested)
+            logger.info(f"Requested Whisper model '{whisper_model_requested}' differs from current model name '{whisper_model_name}'. Updating...")
+            whisper_model_name = whisper_model_requested
         
         logger.info("Using local transcription with WhisperX")
         logger.info("Downloading YouTube audio")
@@ -224,73 +252,21 @@ def transcribe():
         return jsonify({"error": "Invalid transcription method"}), 400
 
     logger.info("Generating prompt")
-    prompt = f"""1.Read the following video transcript carefully, because you'll be asked to perform series of tasks based on them (especially the transcript!):
+    prompt_template = load_prompt_template()
+    if not prompt_template:
+        return jsonify({"error": "Failed to load prompt template"}), 500
 
-<video_details>
-Channel name: {video_details.get('channel', 'Unknown')}
-Video title: {video_details.get('title', 'Unknown')}
-View count: {video_details.get('views', 'Unknown')}
-Likes count: {video_details.get('likes', 'Unknown')}
-Description: {video_details.get('description', 'Unknown')}
-Video URL: {video_url}
-Transcript: 
-{transcript or 'Transcription failed'}
-</video_details>
+    template = jinja2.Template(prompt_template)
+    prompt = template.render(
+        channel=video_details.get('channel', 'Unknown'),
+        title=video_details.get('title', 'Unknown'),
+        views=video_details.get('views', 'Unknown'),
+        likes=video_details.get('likes', 'Unknown'),
+        description=video_details.get('description', 'Unknown'),
+        video_url=video_url,
+        transcript=transcript or 'Transcription failed'
+    )
 
-2. The transcript is in the following format: 
-[start_time - end_time] speaker: transcribed text
-, where start_time signifies when the first word of the transcribed text is spoken and end time when the last word of the transribed text is spoken. "speaker" is the attempt of the transtription algorithm to separate speakers if there are multiple, but it will just say "SPEAKER_00" or "SPEAKER_01" and so on, it's your job to try to identify the speakers.
-
-3. You are an award-winning journalist, you have a reputation for producing informative and unbiased summaries. Your task is to carefully review the video content and extract the crucial facts, presenting them in a clear and organized manner. Prioritize accuracy and objectivity, allowing the information to speak for itself without editorializing. You know many languages and can provide summaries using both the transcript's original language and English.
-
-
-4. Make a clear distinction between:
-a. presented factual and objective data and information
-b. personal experience, opinions and subjective information 
-c. information presented as a fact, but might need cross-checking
-Report all three, but flag them appropriately so the reader knows which is which. If you are unsure or don't have enough information to provide a confident categorization, simply say "I don't know" or "I'm not sure."
-
-5. Use blended summarization technique combining  abstractive summarization (70-90%) extractive summarization (10-30%). Adjust this ratio as needed based on the type of content. Endeavor to address the full breadth of the transcript without significant omissions. Make sure the extracted quotes are short, important and impactful to the narrative.
-
-6. Aim for a summary length that is approximately 20% of the full video transcript. For example, if the transcript is 5000 words long, target a summary of roughly 1000 words. Try to cover the video in full without gaps. However, if the transcript is exceptionally long (over 10,000 words):
-   a. Focus on providing timestamps that cover the entire content.
-   b. Use shorter summaries for each section to maintain a comprehensive overview.
-   c. Ensure that the overall structure still captures the main points and flow of the video.
-
-7. Break down the summary into a chain of key sections or topics. Use these to logically structure it, creating an H1 heading for each main point in the chain of reasoning. 
-
-8. Under each H1 section heading, write 1-3 sentences concisely summarizing the essential information from that section. Aim for an even coverage of the main points.
-
-9. Organize the summary clearly using H2 and H3 subheadings as appropriate to reinforce the logical flow. Utilize bullet points to enhance readability of longer paragraphs or list items. Selectively bold key terms for emphasis. Use blockquotes to highlight longer verbatim quotations.
-
-10. Generate clickable timestamp links for each section header and key point or quote used. Append them after the relevant text. To calculate the timestamp link follow these steps:
-
-a. Note down the starting point of the relevant part of the video in H:MM:SS format (e.g. 0:14:16) 
-b. Convert the hours and minutes portions to seconds (e.g. 14 minutes = 14 * 60 = 840 seconds)
-c. Add the remaining seconds (e.g. 840 + 16 = 856 seconds total) 
-d. Append "&t=X" to the video URL, replacing X with the final total seconds (e.g. &t=856)
-e. Format the full link as: [H:MM:SS]({video_url}&t=X) (e.g. [0:14:18]({video_url}&t=856) )
-
-It is crucial to select precise starting timestamps for the links. For example, consider the following transcript excerpt:
-
-[00:01:10.52 - 00:01:15.68] SPEAKER_00: We train these models to spend more time thinking through problems before they respond, much like a person would.
-[00:01:15.84 - 00:01:20.16] SPEAKER_00: Through training, they learn to refine their thinking process, try different strategies and recognize their mistakes.
-[00:01:20.54 - 00:01:25.03] SPEAKER_00: In our test, the next model update performs similarly to PhD students
-[00:01:25.42 - 00:01:29.55] SPEAKER_00:  on challenging benchmark tasks in physics, chemistry, and biology.
-[00:01:29.73 - 00:01:40.47] SPEAKER_00: We also found that it excels in math and coding in a qualifying exam in the International Mathematics Olympiad, GPT-40 correctly solved only 13% of problems while the reasoning model scored 83%.
-[00:01:41.25 - 00:01:47.14] SPEAKER_00: That is a massive, massive, multiple-time improvement over GPT-40 in math.
-[00:01:47.30 - 00:01:52.92] SPEAKER_00:  Their coding abilities were evaluated in contests and reached the 89th percentile in code forces competitions.
-[00:01:52.96 - 00:01:55.28] SPEAKER_00: You can read more about this in our technical research post.
-[00:01:55.50 - 00:01:56.67] SPEAKER_00: I'll get to that in a moment.
-
-The correct starting timestamp for the quote "In our test, the next model update performs similarly to PhD students on challenging benchmark tasks in physics, chemistry, and biology." would be [00:01:20.54], because that is when the first word "We" appears in the transcript and we take the starting time. Time calculated to seconds in this case is t=80.
-
-11. Vary the sentence structures throughout to maintain an engaging narrative flow. Ensure smooth transitions between sentences and sections. Adopt a consistent voice aligned with the original video's tone.
-
-12. Revise the full summary, checking for any unintended bias or editorializing. Aim to neutrally represent the content of the original video. Consider engaging in a feedback loop with a human reviewer to iteratively optimize the summary.
-
-13. Provide your final video summary, ready for publication. Use all known Markdown operators to present the output."""
-    
     logger.info("Copying prompt to clipboard")
     pyperclip.copy(prompt)
 
@@ -301,13 +277,32 @@ The correct starting timestamp for the quote "In our test, the next model update
         if process_locally:
             logger.info("Processing prompt locally with Llama 3.1 8B model")
             response = process_with_llama(prompt)
+            # Save the prompt and result immediately for local processing
+            save_prompt_and_result_to_csv(prompt, response)
             return jsonify({"response": response, "cached": False})
         else:
             logger.info("Returning prompt for external processing")
-            return jsonify({"prompt": str(prompt), "cached": False})
+            return jsonify({"prompt": str(prompt), "cached": False, "video_url": video_url})
     else:
         logger.error("Failed to generate prompt")
         return jsonify({"error": "Failed to generate prompt"}), 500
+
+@app.route('/save_result', methods=['POST'])
+def save_result():
+    data = request.json
+    prompt = data.get('prompt')
+    result = data.get('result')
+
+    if not all([prompt, result]):
+        logger.error("Missing required data in save_result request")
+        return jsonify({"error": "Missing required data"}), 400
+
+    try:
+        save_prompt_and_result_to_csv(prompt, result)
+        return jsonify({"message": "Result saved successfully"}), 200
+    except Exception as e:
+        logger.error(f"Error saving result: {e}")
+        return jsonify({"error": "Failed to save result"}), 500
 
 def extract_video_id(url):
     logger.info(f"Extracting video ID from URL: {url}")
@@ -491,35 +486,90 @@ def run_server():
     app.run(host='0.0.0.0', port=5000)
 
 def process_with_llama(prompt):
-    logger.info("Processing prompt with Llama 3.1 8B model")
+    logger.info("Processing prompt with Local model")
     try:
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        run_llama_path = os.path.join(current_dir, "run_llama.py")
+        run_local_path = os.path.join(current_dir, "run_llama.py")
         
-        logger.info(f"Attempting to run Llama model with script at: {run_llama_path}")
+        logger.info(f"Attempting to run Local model with script at: {run_local_path}")
         
-        # Pass the log file path as an environment variable
+        # Create a temporary file to store the prompt
+        with tempfile.NamedTemporaryFile(mode='w+', delete=False, encoding='utf-8') as temp_file:
+            temp_file.write(prompt)
+            temp_file_path = temp_file.name
+
+        # Pass the log file path and temp file path as environment variables
         env = {
             **os.environ,
             'PYTHONPATH': current_dir,
-            'LOG_FILE_PATH': log_file  # Assuming log_file is defined earlier in main.py
+            'LOG_FILE_PATH': log_file,
+            'PROMPT_FILE_PATH': temp_file_path
         }
         
+        # Set a timeout for the subprocess (e.g., 10 minutes)
+        timeout = 600  # seconds
+        
         result = subprocess.run(
-            ["python", run_llama_path, prompt],
+            ["python", run_local_path],
             capture_output=True,
             text=True,
             check=True,
-            env=env
+            env=env,
+            timeout=timeout
         )
+
+        # Remove the temporary file
+        os.unlink(temp_file_path)
+
         return result.stdout.strip()
+    except subprocess.TimeoutExpired:
+        logger.error("Local model processing timed out")
+        return "The Local model processing timed out. Please try again with a shorter prompt or simplify your request."
     except subprocess.CalledProcessError as e:
-        logger.error(f"Error processing with Llama model: {e}")
+        logger.error(f"Error processing with Local model: {e}")
         logger.error(f"Stderr: {e.stderr}")
-        return f"Error processing with Llama model: {e.stderr}"
+        return f"Error processing with Local model: {e.stderr}"
     except Exception as e:
         logger.error(f"Unexpected error in process_with_llama: {e}")
         return f"Unexpected error: {str(e)}"
+
+def load_prompt_template():
+    template_path = os.path.join(script_dir, 'prompt_template.txt')
+    try:
+        with open(template_path, 'r', encoding='utf-8') as file:
+            return file.read()
+    except FileNotFoundError:
+        logger.error(f"Prompt template file not found at {template_path}")
+        return None
+
+def save_prompt_and_result_to_csv(prompt, result):
+    csv_file_path = os.path.join(script_dir, 'generated_prompts_and_results.csv')
+    file_exists = os.path.isfile(csv_file_path)
+    
+    try:
+        with open(csv_file_path, 'a', newline='', encoding='utf-8') as csvfile:
+            fieldnames = ['prompt', 'result']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames, 
+                                    quoting=csv.QUOTE_ALL, 
+                                    escapechar='\\', 
+                                    doublequote=True)
+            
+            if not file_exists:
+                writer.writeheader()
+            
+            # Escape any existing double quotes in the content
+            prompt = prompt.replace('"', '""')
+            result = result.replace('"', '""')
+            
+            writer.writerow({
+                'prompt': prompt,
+                'result': result
+            })
+        
+        logger.info(f"Prompt and result saved to CSV file: {csv_file_path}")
+    except Exception as e:
+        logger.error(f"Error saving prompt and result to CSV: {e}")
+        raise
 
 if __name__ == '__main__':
     if len(sys.argv) > 1:
