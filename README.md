@@ -81,7 +81,7 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
      - Tiny
      - Large
      - Turbo
-     
+
 3. **Processing Mode**:
    - Local (uses backend AI model)
    - Remote (uses AI provider)
@@ -134,7 +134,7 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## Acknowledgements
 - [youtube-transcript-api](https://github.com/jdepoix/youtube-transcript-api)
-- [Whisper](https://github.com/openai/whisper)
+- [whisperX](https://github.com/m-bain/whisperX)
 - [llama.cpp](https://github.com/ggerganov/llama.cpp)
 - [marked.js](https://marked.js.org/) for Markdown rendering
 
