@@ -72,7 +72,8 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
 ### Extension Options
 
 1. **Backend URL**: Server address for video processing (default: http://localhost:5000)
-   - Service logs: `C:\ProgramData\YouTubeTranscriptionService\youtube_transcription_service.log`
+   - Service logs location: `C:\ProgramData\YouTubeTranscriptionService\youtube_transcription_service.log`
+   - When running in ad-hoc mode (`python main.py`), logs will be output directly to the console
 
 2. **Transcription Method**:
    - YouTube API (fastest)
@@ -150,3 +151,5 @@ This project is licensed under the [MIT License](LICENSE).
 ## Contact
 
 For questions, suggestions, or collaborations, please open an issue on this repository.
+
+Note: This project has been developed and tested on Windows only. Linux/Mac support is not currently implemented. It will probably work, but the most glaring issue will be the use of os specific logging approach for Windows in backend/main.py. 
