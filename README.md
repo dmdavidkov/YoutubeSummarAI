@@ -76,11 +76,11 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
 
 2. **Transcription Method**:
    - YouTube API (fastest)
-   - Whisper models (more accurate):
+   - Whisper models (possibly more accurate and includes speaker diarization):
      - Base
      - Tiny
      - Large
-     - Turbo
+     - Turbo (Recommended)
 
 3. **Processing Mode**:
    - Local (uses backend AI model)
