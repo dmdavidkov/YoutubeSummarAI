@@ -129,7 +129,7 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
   - Cross-origin communication
   - Provider-specific handling
 
-**Note: This project has been developed and tested on Windows only. Linux/Mac support is not currently implemented. It will probably work, but the most glaring issue will be the use of os specific logging approach for Windows in backend/main.py.**
+**Note: This project has been developed and tested on Windows only. Linux/Mac support is not currently implemented. It will probably work, but the most glaring issue will be the use of Windows OS specific logging and service approach in backend/main.py.**
 
 ## License
 
