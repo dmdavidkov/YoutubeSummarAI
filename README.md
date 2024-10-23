@@ -8,17 +8,30 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
 
 ## Features
 
-- Extract speech from YouTube videos using local speech recognition via Whisper or use YoutubeToText API
-- Generate summaries using local AI models or popular AI services
-- Chrome extension for seamless integration with YouTube 
-- Support for multiple source languages (summaries currently only support English)
-- Customizable summary length and style (planned feature)
+- Extract speech from YouTube videos using:
+  - YouTube's built-in transcript API
+  - Local speech recognition via Whisper models (Base, Base English, Tiny)
+- Generate summaries using:
+  - Local AI models (Meta-Llama-3.1-8B-Instruct)
+  - Popular AI services (You.com, Perplexity, Phind, Google Gemini, ChatGPT)
+  - Custom AI provider support
+- Chrome extension features:
+  - Dockable summary panel that integrates with YouTube's interface
+  - Click-to-seek functionality for timestamped references
+  - Customizable provider settings
+  - Markdown rendering support
+- Support for multiple source languages (summaries currently only in English)
+- Optional conversation logging for tracking summary history
 
 ## Project Structure
 
 - `YoutubeSummarAI/`: Main project directory
-  - `backend/`: Backend directory
-  - `extension/`: Chrome extension directory
+  - `backend/`: Backend Python service
+  - `extension/`: Chrome extension
+    - `background.js`: Service worker for extension functionality
+    - `content.js`: YouTube page integration
+    - `popup.html`: Extension UI
+    - Other extension resources
 
 ## Installation
 
@@ -38,95 +51,102 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
    ```
 4. Set up environment variables:
    - Create a `.env` file in the `backend` directory
-   - Add necessary API keys  (refer to `YoutubeSummarAI\backend\.env.example`)
-   - TODO: Make backend models configurable via file (currently hardcoded Llama 3.1 setup, you can put the llama 3.1 GGUF model file in the `backend` directory)
-   - Backend can be either run with ad-hoc `python main.py` or installed as windows service with `python main.py install` and uninstalled with `python main.py remove`
+   - Add necessary API keys (refer to `backend/.env.example`)
+   - For local AI processing, place the Llama 3.1 GGUF model file in the `backend` directory
 
-*note: if you are using the `python main.py install` option, you will need to run the command prompt with admin privileges*
+5. Run the backend service:
+   - Ad-hoc mode: `python main.py`
+   - Windows service:
+     - Install (requires admin): `python main.py install`
+     - Remove: `python main.py remove`
 
 ### Chrome Extension Setup
 
-1. Open Google Chrome/Brave/Edge/etc. and navigate to `chrome://extensions/`
-2. Enable "Developer mode" in the top right corner
-3. Click "Load unpacked" and select the `extension` directory from the project
-4. You can review and change options by clicking on the YoutubeSummarAI extension icon in the Chrome toolbar
+1. Open Chrome/Brave/Edge and navigate to `chrome://extensions/`
+2. Enable "Developer mode"
+3. Click "Load unpacked" and select the `extension` directory
+4. Configure options via the extension icon
+
+## Configuration
+
+### Extension Options
+
+1. **Backend URL**: Server address for video processing (default: http://localhost:5000)
+   - Service logs: `C:\ProgramData\YouTubeTranscriptionService\youtube_transcription_service.log`
+
+2. **Transcription Method**:
+   - YouTube API (fastest)
+   - Whisper models (more accurate):
+     - Base
+     - Tiny
+     - Large
+     - Turbo
+     
+3. **Processing Mode**:
+   - Local (uses backend AI model)
+   - Remote (uses AI provider)
+
+4. **AI Providers**:
+   - Built-in support:
+     - You.com
+     - Perplexity
+     - Phind
+     - Google Gemini
+     - ChatGPT
+   - Custom provider support with configurable:
+     - URL
+     - Input field selector
+     - Submit button selector
+     - Confirmation button selector (optional)
+     - Result selector
+
+5. **Additional Settings**:
+   - Conversation logging toggle
+   - Provider-specific configurations
 
 ## Usage
 
-1. Open a YouTube video in Google Chrome
-2. Click on the YoutubeSummarAI extension icon
-3. Select desired summary options (if available)
-4. Click "Generate Summary" to get a concise summary of the video content
-
-## Options page
-
-The extension's options page allows users to customize various settings:
-
-1. Backend URL: This setting specifies the server address for video transcription and processing. By default, it's set to a local server (e.g., http://localhost:5000). You may need to adjust this URL based on your specific setup. To troubleshoot connection issues, check the service log file located at:
-   C:\ProgramData\YouTubeTranscriptionService\youtube_transcription_service.log
-
-2. Transcription Method:
-   - Choose between YouTube API or different Whisper models for transcribing video content.
-   - Options include YouTube API, Whisper (Base), Whisper (Base English), Whisper (Tiny), etc.
-
-3. Process Locally:
-   - Toggle between processing summaries locally or using an external AI provider.
-   - Options: Yes or No
-
-4. AI Provider (when not processing locally):
-   - Select from various AI providers for summary generation.
-   - Options are dynamically populated based on available providers.
-
-5. Provider-specific settings:
-   - Each AI provider has its own set of configurable options:
-     - URL: The endpoint for the AI service
-     - Input Selector: CSS selector for the input field
-     - Button Selector: CSS selector for the submit button
-     - Confirm Button Selector: CSS selector for any confirmation button (if applicable)
-     - Result Selector: CSS selector for the generated summary
-
-*note: The selectors are subject to change as the UI of the providers change. You can find the correct selectors by inspecting the elements in the page.*
-
-These options can be accessed and modified through the extension's options page, which can be reached by right-clicking the extension icon and selecting "Options" or through the Chrome extensions management page.
-
-## Technologies Used
-
-- Python 3.10+
-  - Speech recognition libraries for text extraction
-  - Natural Language Processing (NLP) libraries for summarization
-- JavaScript (ES6+) for Chrome extension
-- AI Models:
-  - Meta-Llama-3.1-8B-Instruct for local summary generation
-  - OpenAI Whisper for Youtube video to text transcription
-- Chrome Extension APIs
+1. Click the extension icon on any YouTube video
+2. Use the docked panel or popup interface
+3. Click "Generate Summary"
+4. For timestamped references, click the timestamp to seek in the video
 
 ## Development
 
-- Backend: The Python backend handles video processing, text extraction, and summary generation.
-- Frontend: The Chrome extension provides the user interface and communicates with the backend.
+### Backend
+- Python 3.10+ required
+- Key dependencies:
+  - youtube-transcript-api
+  - whisper
+  - llama.cpp
 
-To contribute to the development:
-1. Fork the repository
-2. Create a new branch for your feature
-3. Implement your changes
-4. Submit a pull request with a detailed description of your modifications
+### Extension
+- Chrome Extension Manifest V3
+- Key features:
+  - Service worker (background.js)
+  - Content script injection
+  - Cross-origin communication
+  - Provider-specific handling
 
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
 
 ## Acknowledgements
-- https://github.com/jdepoix/youtube-transcript-api for the Youtube transcript API
-- https://github.com/openai/whisper for the Whisper models
-- https://github.com/ggerganov/llama.cpp for the local inference capabilites
-- Contributors and open-source projects that made this possible
+- [youtube-transcript-api](https://github.com/jdepoix/youtube-transcript-api)
+- [Whisper](https://github.com/openai/whisper)
+- [llama.cpp](https://github.com/ggerganov/llama.cpp)
+- [marked.js](https://marked.js.org/) for Markdown rendering
 
 ## Roadmap
 
-- Make backend models and setup configurable via parameters
-- Add customizable summary lengths and styles
-- Integrate with more video platforms/sources
+- [ ] Configurable backend models via parameters
+- [ ] Summary length and style options
+- [ ] Additional video platform support
+- [ ] Multi-language summary support
+- [ ] Enhanced provider management
+- [ ] Improved error handling and recovery
 
 ## Contact
 
-For questions, suggestions, or collaborations, please open an issue on this repository or contact the maintainers directly.
+For questions, suggestions, or collaborations, please open an issue on this repository.
