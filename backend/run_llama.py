@@ -66,8 +66,8 @@ def generate_response(llm, messages, max_length=8192):
 if __name__ == "__main__":
     try:
         # Log the environment variables
-        logger.debug(f"LOG_FILE_PATH: {os.environ.get('LOG_FILE_PATH')}")
-        logger.debug(f"PROMPT_FILE_PATH: {os.environ.get('PROMPT_FILE_PATH')}")
+        # logger.debug(f"LOG_FILE_PATH: {os.environ.get('LOG_FILE_PATH')}")
+        # logger.debug(f"PROMPT_FILE_PATH: {os.environ.get('PROMPT_FILE_PATH')}")
 
         # Read the prompt from the temporary file
         prompt_file_path = os.environ.get('PROMPT_FILE_PATH')
@@ -81,7 +81,7 @@ if __name__ == "__main__":
             {"role": "user", "content": user_input}
         ]
         response = generate_response(llm, messages)
-        logger.debug(f"Generated response: {response}")
+        # logger.debug(f"Generated response: {response}")
         
         # Use sys.stdout.buffer.write() to handle Unicode characters
         sys.stdout.buffer.write(response.encode('utf-8'))
