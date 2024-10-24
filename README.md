@@ -126,7 +126,7 @@ choco install ffmpeg
 
 3. The first time it will download models and will take some time. You can check progress in the log file or terminal output.
 
-4. For Nvidia GPU acceleration make sure Cuda and cudNN are installed and you have the appropriate PyTorch version utilizing them. 
+4. For Nvidia GPU acceleration make sure Cuda and cuDNN are installed and you have the appropriate PyTorch version utilizing them. 
 
 ## Development
 
