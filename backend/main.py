@@ -111,14 +111,19 @@ def download_youtube_audio(url, output_path='.'):
     logger.info(f"Downloading audio from URL: {url}")
     unique_filename = f"{uuid.uuid4()}.wav"
     full_path = os.path.join(output_path, unique_filename)
-    
-    # Modified options to avoid ffmpeg post-processing
     ydl_opts = {
-        'format': 'bestaudio/best',  # This will get the best audio format available
+        'format': 'bestaudio/best',
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'wav',
+            'preferredquality': '192',
+        }],
         'outtmpl': full_path,
-        'postprocessors': [],  # Remove post-processors that require ffmpeg
+        'postprocessor_args': [
+            '-ar', '16000',
+            '-ac', '1',
+        ],
     }
-    
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])

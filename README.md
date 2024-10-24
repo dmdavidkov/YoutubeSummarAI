@@ -39,7 +39,7 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/YoutubeSummarAI.git
+   git clone https://github.com/1n1n1t3/YoutubeSummarAI
    ```
 2. Navigate to the project directory:
    ```bash
@@ -109,8 +109,12 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
 
 1. Click the extension icon on any YouTube video
 2. Use the docked panel or popup interface
-3. Click "Generate Summary"
+3. Click "Generate Summary" 
 4. For timestamped references, click the timestamp to seek in the video
+
+**(Note: Keep in mind if you choose local audio transcription the first time it will download models and will take some time. You can check progress in the log file or terminal output)**
+
+**(Note2: For local transcription you'll need ffmpeg installed and added to PATH. Reccomended build: https://github.com/yt-dlp/FFmpeg-Builds?tab=readme-ov-file)**
 
 ## Development
 
@@ -118,8 +122,10 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
 - Python 3.10+ required
 - Key dependencies:
   - youtube-transcript-api
-  - whisper
+  - yt-dlp
+  - whisperx
   - llama.cpp
+  - ffmpeg
 
 ### Extension
 - Chrome Extension Manifest V3
@@ -139,7 +145,7 @@ This project is licensed under the [MIT License](LICENSE).
 - [youtube-transcript-api](https://github.com/jdepoix/youtube-transcript-api)
 - [whisperX](https://github.com/m-bain/whisperX)
 - [llama.cpp](https://github.com/ggerganov/llama.cpp)
-- [marked.js](https://marked.js.org/) for Markdown rendering
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp)
 
 ## Roadmap
 
