@@ -12,7 +12,7 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
   - YouTube's built-in transcript API
   - Local speech recognition via Whisper models (Base, Base English, Tiny)
 - Generate summaries using:
-  - Local AI models (Meta-Llama-3.1-8B-Instruct)
+  - Local AI models (currently setup for Qwen 2.5 7B)
   - Popular AI services (You.com, Perplexity, Phind, Google Gemini, ChatGPT)
   - Custom AI provider support
 - Chrome extension features:
@@ -45,19 +45,23 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
    ```bash
    cd YoutubeSummarAI/backend
    ```
-3. Install dependencies:
+3. (Optional) For support of Cuda in local summarization model:
+  ```bash
+  set CMAKE_ARGS="-DGGML_CUDA=on"
+  ```
+4. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
-4. Set up environment variables:
+5. Set up environment variables:
    - Create a `.env` file in the `backend` directory
    - Add necessary API keys (refer to `backend/.env.example`)
    - For local AI processing, place the Llama 3.1 GGUF model file in the `backend` directory
 
-5. Run the backend service:
+6. Run the backend service:
    - Ad-hoc mode: `python main.py`
    - Windows service:
-     - Install (requires admin): `python main.py install`
+     - Install (requires admin): `python main.py install` then `python main.py start`
      - Remove: `python main.py remove`
 
 ### Chrome Extension Setup
@@ -128,6 +132,14 @@ choco install ffmpeg
 
 4. For Nvidia GPU acceleration make sure Cuda and cuDNN are installed and you have the appropriate PyTorch version utilizing them. 
 
+## Considerations for Local summarization using llama.cpp
+
+1. You can place the model in the /backend folder in gguf format or let the code download the model from HF. 
+
+2. Currently the setup is for Qwen2.5 7B model. If you want you can use another model, but you need to go to run_llama.py and update the repo/modelname, response (the stop token) and chat template variables. 
+
+3. The project utilizes https://github.com/abetlen/llama-cpp-python library. If you want a NVIDIA/CUDA GPU acceleration refer to https://github.com/abetlen/llama-cpp-python?tab=readme-ov-file#supported-backends
+
 ## Development
 
 ### Backend
@@ -136,7 +148,7 @@ choco install ffmpeg
   - youtube-transcript-api
   - yt-dlp
   - whisperx
-  - llama.cpp
+  - llama-cpp-python 
   - ffmpeg
 
 ### Extension
@@ -155,9 +167,9 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## Acknowledgements
 - [youtube-transcript-api](https://github.com/jdepoix/youtube-transcript-api)
-- [whisperX](https://github.com/m-bain/whisperX)
-- [llama.cpp](https://github.com/ggerganov/llama.cpp)
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp)
+- [whisperX](https://github.com/m-bain/whisperX)
+- [llama-cpp-python](https://github.com/abetlen/llama-cpp-python)
 
 ## Roadmap
 

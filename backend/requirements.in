@@ -27,6 +27,7 @@ pandas
 # Machine learning
 torch
 transformers
+llama-cpp-python
 
 # API
 google-api-python-client

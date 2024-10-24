@@ -58,6 +58,8 @@ cycler==0.12.1
     # via matplotlib
 decorator==5.1.1
     # via librosa
+diskcache==5.6.3
+    # via llama-cpp-python
 docopt==0.6.2
     # via
     #   pyannote-metrics
@@ -66,7 +68,6 @@ einops==0.8.0
     # via pyannote-audio
 faster-whisper==1.0.1
     # via whisperx
-    # via -r backend/requirements.in
 filelock==3.16.0
     # via
     #   huggingface-hub
@@ -129,6 +130,7 @@ jinja2==3.1.2
     # via
     #   -r backend/requirements.in
     #   flask
+    #   llama-cpp-python
     #   torch
 joblib==1.4.2
     # via
@@ -151,6 +153,8 @@ lightning-utilities==0.11.7
     #   lightning
     #   pytorch-lightning
     #   torchmetrics
+llama-cpp-python==0.3.1
+    # via -r backend/requirements.in
 llvmlite==0.43.0
     # via numba
 mako==1.3.5
@@ -189,6 +193,7 @@ numpy==1.26.4
     #   contourpy
     #   ctranslate2
     #   librosa
+    #   llama-cpp-python
     #   matplotlib
     #   numba
     #   onnxruntime
@@ -443,6 +448,7 @@ typing-extensions==4.12.2
     #   librosa
     #   lightning
     #   lightning-utilities
+    #   llama-cpp-python
     #   pyannote-core
     #   pytorch-lightning
     #   sqlalchemy
