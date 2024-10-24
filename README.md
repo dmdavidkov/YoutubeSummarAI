@@ -112,9 +112,17 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
 3. Click "Generate Summary" 
 4. For timestamped references, click the timestamp to seek in the video
 
-**(Note: Keep in mind if you choose local audio transcription the first time it will download models and will take some time. You can check progress in the log file or terminal output)**
+**iew and set options with right click on the extension icon and chosing "Options"**
 
-**(Note2: For local transcription you'll need ffmpeg installed and added to PATH. Reccomended build: https://github.com/yt-dlp/FFmpeg-Builds?tab=readme-ov-file)**
+## Considerations
+
+1. For local transcription you'll need ffmpeg installed and added to PATH. Reccomended build: https://github.com/yt-dlp/FFmpeg-Builds?tab=readme-ov-file
+
+2. For local transcription you might need additional setup in Hugging Face for the access of the models. See https://github.com/m-bain/whisperX?tab=readme-ov-file#speaker-diarization
+
+3. Keep in mind if you choose local audio transcription the first time it will download models and will take some time. You can check progress in the log file or terminal output.
+
+4. For Nvidia GPU acceleration make sure Cuda and cudNN are installed and you have the appropriate PyTorch version utilizing them.
 
 ## Development
 

@@ -29,7 +29,9 @@ import tempfile
 import jinja2
 import csv
 import io
+import ssl
 
+ssl._create_default_https_context = ssl._create_stdlib_context
 # Set up logging
 log_dir = os.path.join(os.environ['PROGRAMDATA'], 'YouTubeTranscriptionService')
 os.makedirs(log_dir, exist_ok=True)
