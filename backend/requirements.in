@@ -3,6 +3,7 @@ flask
 
 # YouTube video download
 yt-dlp
+youtube_transcript_api
 
 # Environment variables
 python-dotenv

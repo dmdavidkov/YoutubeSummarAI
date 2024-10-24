@@ -58,6 +58,10 @@ app = Flask(__name__)
 yt_api_Key = os.environ.get('YOUTUBE_API_KEY')
 hf_auth_token = os.environ.get('HF_AUTH_TOKEN')
 
+# Add this check right after loading the API key
+if not yt_api_Key:
+    logger.error("YouTube API key not found. Please set YOUTUBE_API_KEY in .env file")
+
 # Add a global variable to store the last response
 last_response_cache = None
 
@@ -107,19 +111,14 @@ def download_youtube_audio(url, output_path='.'):
     logger.info(f"Downloading audio from URL: {url}")
     unique_filename = f"{uuid.uuid4()}.wav"
     full_path = os.path.join(output_path, unique_filename)
+    
+    # Modified options to avoid ffmpeg post-processing
     ydl_opts = {
-        'format': 'bestaudio/best',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'wav',
-            'preferredquality': '192',
-        }],
+        'format': 'bestaudio/best',  # This will get the best audio format available
         'outtmpl': full_path,
-        'postprocessor_args': [
-            '-ar', '16000',
-            '-ac', '1',
-        ],
+        'postprocessors': [],  # Remove post-processors that require ffmpeg
     }
+    
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
@@ -188,6 +187,12 @@ def transcribe():
     global last_response_cache, whisper_model_name
     
     logger.info("Received transcription request")
+    
+    # Add this check at the start of the route
+    if not yt_api_Key:
+        error_msg = "YouTube API key not configured. Please set YOUTUBE_API_KEY in the .env file"
+        logger.error(error_msg)
+        return jsonify({"error": error_msg}), 500
     
     video_url = request.json.get('url')
     transcription_method = request.json.get('transcriptionMethod')
