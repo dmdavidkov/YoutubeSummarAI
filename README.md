@@ -10,7 +10,7 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
 
 - Extract speech from YouTube videos using:
   - YouTube's built-in transcript API
-  - Local speech recognition via Whisper models (Base, Base English, Tiny)
+  - Local speech recognition via Whisper models
 - Generate summaries using:
   - Local AI models (currently setup for Qwen 2.5 7B)
   - Popular AI services (You.com, Perplexity, Phind, Google Gemini, ChatGPT)
@@ -39,7 +39,7 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/1n1n1t3/YoutubeSummarAI
+   git clone https://github.com/dmdavidkov/YoutubeSummarAI
    ```
 2. Navigate to the project directory:
    ```bash
@@ -123,7 +123,7 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
 1. You'll need ffmpeg installed and added to PATH. Download build from https://github.com/yt-dlp/FFmpeg-Builds?tab=readme-ov-file and add bin folder to to PATH in System Environment Variables
 or
 On windows you can also use:
-# using Chocolatey (https://chocolatey.org/)
+### using Chocolatey (https://chocolatey.org/)
 choco install ffmpeg
 
 2. You need additional setup in Hugging Face for the access of the models. See https://github.com/m-bain/whisperX?tab=readme-ov-file#speaker-diarization
