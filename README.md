@@ -121,9 +121,7 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
 ## Considerations for Local Transcription
 
 1. You'll need ffmpeg installed and added to PATH. Download build from https://github.com/yt-dlp/FFmpeg-Builds?tab=readme-ov-file and add bin folder to to PATH in System Environment Variables
-or
-On windows you can also use:
-### using Chocolatey (https://chocolatey.org/)
+orOn windows you can also use Chocolatey (https://chocolatey.org/):
 choco install ffmpeg
 
 2. You need additional setup in Hugging Face for the access of the models. See https://github.com/m-bain/whisperX?tab=readme-ov-file#speaker-diarization
