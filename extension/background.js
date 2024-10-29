@@ -173,14 +173,6 @@ const MAX_WAIT_TIME = 60000; // 60 seconds
 const MIN_CONTENT_LENGTH = 300; // Minimum length
 const CONTENT_STABLE_TIME = 3000; // 3 seconds of stable content
 
-// Add this state tracking object
-const windowState = {
-    lastContent: '',
-    contentStableTime: 0,
-    checkInterval: null,
-    startTime: 0
-};
-
 // Replace the existing closeNewTab function with this improved version
 function closeNewTab(prompt, content) {
     if (newTabId !== null) {
@@ -498,80 +490,88 @@ async function copyToClipboardInBackground(text) {
     }
 }
 
-// Add these new functions for improved window management
-function startWindowCloseMonitoring(tabId, provider) {
-    // Reset state
-    windowState.lastContent = '';
-    windowState.contentStableTime = 0;
-    windowState.startTime = Date.now();
-    
-    // Store provider in windowState
-    windowState.provider = provider;
-    
-    // Clear any existing interval
-    if (windowState.checkInterval) {
-        clearInterval(windowState.checkInterval);
-    }
+// Replace the window state tracking object with simpler settings
+const WINDOW_SETTINGS = {
+    MIN_CONTENT_LENGTH: 300,
+    INITIAL_DELAY: 2000,     // Wait 2s before starting to check content
+    CHECK_INTERVAL: 1000,    // Check every 1s
+    STABILITY_DELAY: 3000,   // Content must be stable for 3s
+    MAX_WAIT_TIME: 60000    // Maximum 60s wait time
+};
 
-    // Initial delay before starting checks
-    setTimeout(() => {
-        windowState.checkInterval = setInterval(() => {
-            checkWindowContent(tabId);
-        }, CHECK_INTERVAL);
-    }, INITIAL_CHECK_DELAY);
+// Simplified window monitoring function
+function startWindowCloseMonitoring(tabId, provider) {
+    let lastContent = '';
+    let stableStartTime = null;
+    let monitoringInterval = null;
 
     // Set maximum wait time
+    const maxWaitTimeout = setTimeout(() => {
+        cleanup('Maximum wait time reached');
+    }, WINDOW_SETTINGS.MAX_WAIT_TIME);
+
+    // Start checking after initial delay
     setTimeout(() => {
-        if (windowState.checkInterval) {
-            clearInterval(windowState.checkInterval);
-            forceCloseWindow(tabId);
-        }
-    }, MAX_WAIT_TIME);
-}
+        monitoringInterval = setInterval(() => {
+            checkContent();
+        }, WINDOW_SETTINGS.CHECK_INTERVAL);
+    }, WINDOW_SETTINGS.INITIAL_DELAY);
 
-function checkWindowContent(tabId) {
-    chrome.tabs.sendMessage(tabId, { 
-        action: 'getContent',
-        provider: windowState.provider
-    }, (response) => {
-        if (chrome.runtime.lastError || !response) {
-            console.log('Error getting content:', chrome.runtime.lastError);
-            return;
-        }
-
-        const currentContent = response.content;
-        
-        if (currentContent === windowState.lastContent && 
-            currentContent.length > MIN_CONTENT_LENGTH) {
-            
-            if (!windowState.contentStableTime) {
-                windowState.contentStableTime = Date.now();
+    // Main content checking function
+    function checkContent() {
+        chrome.tabs.sendMessage(tabId, { 
+            action: 'getContent',
+            provider: provider
+        }, (response) => {
+            if (chrome.runtime.lastError || !response) {
+                console.log('Error getting content:', chrome.runtime.lastError);
+                return;
             }
-            
-            if (Date.now() - windowState.contentStableTime > CONTENT_STABLE_TIME) {
-                clearInterval(windowState.checkInterval);
-                
-                // Send content to YouTube tab using divContent action instead
-                forwardMessageToYouTubeTabs({ 
-                    action: 'divContent', 
-                    content: currentContent 
-                });
 
-                // Then close the tab directly
-                if (newTabId !== null) {
-                    chrome.tabs.remove(newTabId, () => {
-                        if (chrome.runtime.lastError) {
-                            console.error('Error closing tab:', chrome.runtime.lastError);
-                            setTimeout(() => chrome.tabs.remove(newTabId), 500);
-                        }
-                        newTabId = null;
-                    });
+            const currentContent = response.content;
+            
+            // Check if content meets minimum length and hasn't changed
+            if (currentContent.length > WINDOW_SETTINGS.MIN_CONTENT_LENGTH) {
+                if (currentContent === lastContent) {
+                    // Start or continue stability timer
+                    if (!stableStartTime) {
+                        stableStartTime = Date.now();
+                    } else if (Date.now() - stableStartTime >= WINDOW_SETTINGS.STABILITY_DELAY) {
+                        cleanup('Content stable', currentContent);
+                    }
+                } else {
+                    // Content changed, reset stability timer
+                    stableStartTime = null;
+                    lastContent = currentContent;
                 }
             }
-        } else {
-            windowState.lastContent = currentContent;
-            windowState.contentStableTime = 0;
+        });
+    }
+
+    // Cleanup function
+    function cleanup(reason, content = null) {
+        console.log('Closing window:', reason);
+        clearInterval(monitoringInterval);
+        clearTimeout(maxWaitTimeout);
+
+        if (content) {
+            // Forward content to YouTube tabs
+            forwardMessageToYouTubeTabs({ 
+                action: 'divContent', 
+                content: content 
+            });
         }
-    });
+
+        // Close the tab
+        if (newTabId !== null) {
+            chrome.tabs.remove(newTabId, () => {
+                if (chrome.runtime.lastError) {
+                    console.error('Error closing tab:', chrome.runtime.lastError);
+                    setTimeout(() => chrome.tabs.remove(newTabId), 500);
+                }
+                newTabId = null;
+            });
+        }
+    }
 }
 

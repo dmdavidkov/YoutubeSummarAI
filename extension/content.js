@@ -9,7 +9,6 @@
     console.log("Content script loaded");
 
     let bufferDiv = document.createElement('div');
-    let timeoutId;
     let providerSettings = {};
     let currentObserver = null;
     let dockedDiv = null;
@@ -346,83 +345,42 @@
     }
 
     function setupObserver(provider, selectors) {
-        let previousDivContent = null;
-        let mutationCount = 0;
-        let lastMutationTime = Date.now();
+        let previousContent = null;
         console.log("Setting up observer for", provider);
 
-        const targetNode = document.body;
-        const config = { childList: true, subtree: true, characterData: true };
+        const observer = new MutationObserver(() => {
+            const resultElement = document.querySelector(selectors.resultSelector);
+            
+            if (!resultElement) {
+                chrome.runtime.sendMessage({ 
+                    action: 'selectorWaiting', 
+                    message: `Waiting for result selector "${selectors.resultSelector}"...`,
+                    selector: selectors.resultSelector,
+                    isResultSelector: true
+                });
+                return;
+            }
 
-        const observer = new MutationObserver((mutations) => {
-            for (let mutation of mutations) {
-                if (mutation.type === 'childList' || mutation.type === 'characterData') {
-                    const divElement = document.querySelector(selectors.resultSelector);
-                    if (divElement) {
-                        const divContent = divElement.innerHTML;
-                        if (divContent !== previousDivContent) {
-                            chrome.runtime.sendMessage({ 
-                                action: 'divContent', 
-                                content: divContent 
-                            });
-                            previousDivContent = divContent;
-                            mutationCount++;
-                            lastMutationTime = Date.now();
-                            resetTimer();
-
-                            chrome.runtime.sendMessage({ action: 'contentUpdating' });
-                        }
-                    } else {
-                        console.log("Result selector not found");
-                        chrome.runtime.sendMessage({ 
-                            action: 'selectorWaiting', 
-                            message: `Waiting for result selector "${selectors.resultSelector}" to become active...`,
-                            selector: selectors.resultSelector,
-                            isResultSelector: true
-                        });
-                    }
-                }
+            const currentContent = resultElement.innerHTML;
+            if (currentContent !== previousContent) {
+                previousContent = currentContent;
+                chrome.runtime.sendMessage({ 
+                    action: 'divContent', 
+                    content: currentContent 
+                });
+                chrome.runtime.sendMessage({ action: 'contentUpdating' });
             }
         });
 
-        observer.observe(targetNode, config);
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            characterData: true
+        });
+
         return observer;
     }
 
-    function resetTimer() {
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-
-            // Click the copy button if it exists
-            // TODO: make this work for other providers via providerSettings
-            const copyButton = document.querySelector('[data-testid="copy-button"]');
-            if (copyButton) {
-                console.log("Copy button found, clicking it");
-                copyButton.click();
-            } else {
-                console.log("Copy button not found");
-            }
-            sendCloseTabMessage();
-            // chrome.runtime.sendMessage({ action: 'closeTab' });
-            console.log("closeTab message sent");
-            if (currentObserver) {
-                currentObserver.disconnect();
-            }
-        }, 6000); // 6 seconds
-    }
-    async function sendCloseTabMessage() {
-        try {
-            const clipboardText = await navigator.clipboard.readText();
-            chrome.runtime.sendMessage({ 
-                action: 'closeTab', 
-                prompt: globalPrompt, 
-                clipboard: clipboardText 
-            });
-            console.log("closeTab message sent");
-        } catch (error) {
-            console.error("Failed to read clipboard contents:", error);
-        }
-    }
     function handlePastePrompt(request) {
         const provider = request.provider;
         const selectors = request.selectors;
