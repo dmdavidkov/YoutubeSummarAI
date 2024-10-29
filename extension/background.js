@@ -166,13 +166,6 @@ function forwardMessageToYouTubeTabs(message) {
     });
 }
 
-// Update these constants
-const INITIAL_CHECK_DELAY = 5000; // 5 seconds
-const CHECK_INTERVAL = 1000; // 1 second
-const MAX_WAIT_TIME = 60000; // 60 seconds
-const MIN_CONTENT_LENGTH = 300; // Minimum length
-const CONTENT_STABLE_TIME = 3000; // 3 seconds of stable content
-
 // Replace the existing closeNewTab function with this improved version
 function closeNewTab(prompt, content) {
     if (newTabId !== null) {
@@ -492,11 +485,11 @@ async function copyToClipboardInBackground(text) {
 
 // Replace the window state tracking object with simpler settings
 const WINDOW_SETTINGS = {
-    MIN_CONTENT_LENGTH: 300,
-    INITIAL_DELAY: 2000,     // Wait 2s before starting to check content
+    MIN_CONTENT_LENGTH: 3000,
+    INITIAL_DELAY: 15000,     // Wait 2s before starting to check content
     CHECK_INTERVAL: 1000,    // Check every 1s
     STABILITY_DELAY: 3000,   // Content must be stable for 3s
-    MAX_WAIT_TIME: 60000    // Maximum 60s wait time
+    MAX_WAIT_TIME: 180000    // Maximum 60s wait time
 };
 
 // Simplified window monitoring function
