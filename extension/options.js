@@ -116,7 +116,12 @@ function generateProviderSettings() {
 
 function handleProviderChange() {
     const aiProvider = document.getElementById('aiProvider').value;
-    showProviderSettings(aiProvider);
+    if (aiProvider) {
+        showProviderSettings(aiProvider);
+        showSelectorStatus(`${aiProvider} provider selected`, 'success', 2000);
+    } else {
+        showSelectorStatus('Please select a provider', 'error', 2000);
+    }
 }
 
 function showProviderSettings(provider) {
@@ -135,11 +140,22 @@ function handleProcessLocallyChange() {
     const processLocally = document.getElementById('processLocally').value === 'true';
     const aiProviderSection = document.getElementById('aiProviderSection');
     aiProviderSection.style.display = processLocally ? 'none' : 'block';
+    
+    if (processLocally) {
+        showStatus('Local processing enabled - AI provider settings hidden', 'success', 2000);
+    }
 }
 
 function restoreOptions() {
     console.log("Restoring options");
+    showStatus('Loading settings...', 'loading', 0);
+    
     chrome.storage.sync.get(null, function(items) {
+        if (chrome.runtime.lastError) {
+            showStatus('Error loading settings: ' + chrome.runtime.lastError.message, 'error');
+            return;
+        }
+
         console.log("Retrieved items for restoring:", items);
         const aiProviderElement = document.getElementById('aiProvider');
         if (aiProviderElement && items.aiProvider) {
@@ -181,11 +197,47 @@ function restoreOptions() {
             transcriptionMethodElement.value = items.transcriptionMethod || '';
             console.log(`Restored transcriptionMethod:`, transcriptionMethodElement.value);
         }
+
+        showStatus('Settings loaded successfully!', 'success', 2000);
     });
+}
+
+function showStatus(message, type = 'success', duration = 3000) {
+    const status = document.getElementById('status');
+    if (!status) return;
+
+    // Clear any existing classes and add new ones
+    status.className = `${type} show`;
+    status.textContent = message;
+
+    // Clear the status message after the specified duration
+    if (duration) {
+        setTimeout(() => {
+            status.className = '';
+            status.textContent = '';
+        }, duration);
+    }
+}
+
+function showSelectorStatus(message, type = 'success', duration = 3000) {
+    const status = document.getElementById('selectorStatus');
+    if (!status) return;
+
+    status.className = `${type} show`;
+    status.textContent = message;
+
+    if (duration) {
+        setTimeout(() => {
+            status.className = '';
+            status.textContent = '';
+        }, duration);
+    }
 }
 
 // Saves options to chrome.storage
 function saveOptions() {
+    showStatus('Saving settings...', 'loading', 0);
+
     const newSettings = {
         aiProvider: document.getElementById('aiProvider')?.value,
         transcriptionMethod: document.getElementById('transcriptionMethod')?.value,
@@ -207,12 +259,10 @@ function saveOptions() {
     }
 
     chrome.storage.sync.set(newSettings, () => {
-        const status = document.getElementById('status');
-        if (status) {
-            status.textContent = 'Options saved.';
-            setTimeout(() => {
-                status.textContent = '';
-            }, 3000);
+        if (chrome.runtime.lastError) {
+            showStatus('Error saving options: ' + chrome.runtime.lastError.message, 'error');
+        } else {
+            showStatus('Settings saved successfully!', 'success');
         }
     });
 }

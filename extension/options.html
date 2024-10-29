@@ -102,11 +102,46 @@
             transform: scale(0.98);
         }
 
+        /* Updated status message styling */
         #status, #selectorStatus {
             margin-top: 15px;
-            text-align: center;
-            color: var(--primary-color);
+            padding: 10px;
+            border-radius: 6px;
             font-size: 13px;
+            transition: all 0.3s ease;
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+
+        #status.show, #selectorStatus.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        #status.success, #selectorStatus.success {
+            background-color: rgba(76, 175, 80, 0.1);
+            color: var(--primary-color);
+            border-left: 4px solid var(--primary-color);
+        }
+
+        #status.error, #selectorStatus.error {
+            background-color: rgba(244, 67, 54, 0.1);
+            color: #f44336;
+            border-left: 4px solid #f44336;
+        }
+
+        /* Loading animation for status messages */
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+
+        #status.loading, #selectorStatus.loading {
+            background-color: rgba(33, 150, 243, 0.1);
+            color: #2196f3;
+            border-left: 4px solid #2196f3;
+            animation: pulse 1.5s infinite;
         }
 
         .provider-settings {
