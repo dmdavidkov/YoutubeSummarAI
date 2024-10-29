@@ -190,13 +190,16 @@ function closeNewTab(prompt, content) {
     });
 }
 
-// Seek to time in YouTube tab
+// Replace the existing seekToTimeInYouTubeTab function
 function seekToTimeInYouTubeTab(time) {
-    chrome.tabs.query({ url: "https://www.youtube.com/*" }, (tabs) => {
-        tabs.forEach(tab => {
-            console.log('Seeking to time in YouTube tab:', time);
-            chrome.tabs.sendMessage(tab.id, { action: 'seekToTimeEx', time: time });
-        });
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        const activeTab = tabs[0];
+        if (activeTab && activeTab.url && activeTab.url.includes("youtube.com/watch")) {
+            console.log('Seeking to time in active YouTube tab:', time);
+            chrome.tabs.sendMessage(activeTab.id, { action: 'seekToTimeEx', time: time });
+        } else {
+            console.log('Active tab is not a YouTube video page');
+        }
     });
 }
 
