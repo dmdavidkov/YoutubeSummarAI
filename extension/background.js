@@ -109,6 +109,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 waitingTimeout = null;
             }
             break;
+        case 'openOptions':
+            chrome.runtime.openOptionsPage();
+            break;
+        case 'closeExtension':
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                if (tabs[0] && tabs[0].url && tabs[0].url.includes("youtube.com/watch")) {
+                    chrome.tabs.sendMessage(tabs[0].id, { action: 'toggleDockedDiv' });
+                }
+            });
+            break;
     }
 
     // Send an immediate response for synchronous handling

@@ -210,25 +210,61 @@
     }
 
     function handleAnchorClick(event) {
+        const { target } = event;
         console.log('Click detected');
-        const anchorElement = event.target.closest('a');
-        if (anchorElement) {
-            console.log('Anchor tag found:', anchorElement);
-            event.preventDefault();
-            
-            // Get the href and decode it if needed
+    
+        // Handle special button clicks
+        const specialButtons = {
+            'optionsBtn': 'openOptions',
+            'closeBtn': 'closeExtension'
+        };
+    
+        const elementId = target.id || target.parentElement?.id || target.parentElement?.parentElement?.id;
+
+        if (elementId && specialButtons[elementId]) {
+            chrome.runtime.sendMessage({ action: specialButtons[elementId] });
+            return;
+        }
+        
+        if (elementId === 'copyBtn') {
+            const summaryDiv = document.getElementById('summary');
+            if (summaryDiv) {
+                const textArea = document.createElement('textarea');
+                textArea.value = summaryDiv.innerText;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    console.log('Content copied successfully');
+                } catch (err) {
+                    console.error('Failed to copy content:', err);
+                }
+                document.body.removeChild(textArea);
+            }
+        }
+
+        // Handle timestamp links
+        const anchorElement = target.closest('a');
+        if (!anchorElement) return;
+    
+        event.preventDefault();
+        console.log('Anchor tag found:', anchorElement);
+    
+        try {
             const href = decodeURIComponent(anchorElement.href);
-            const youtubeUrlMatch = href.match(/https?:\/\/(?:www\.)?youtube\.com\/watch\?.*?t=(\d+)/);
-            
-            if (youtubeUrlMatch && youtubeUrlMatch[1]) {
-                const timeParam = youtubeUrlMatch[1];
+            const timestampRegex = /https?:\/\/(?:www\.)?youtube\.com\/watch\?.*?t=(\d+)/;
+            const timeMatch = href.match(timestampRegex);
+    
+            if (timeMatch?.[1]) {
                 chrome.runtime.sendMessage({
                     action: 'seekToTimeEx',
-                    time: timeParam
-                });
+                    time: timeMatch[1]
+                }).catch(err => console.error('Failed to send seekToTimeEx message:', err));
             } else {
                 console.log('No valid YouTube timestamp found in URL:', href);
             }
+        } catch (error) {
+            console.error('Error processing anchor click:', error);
         }
     }
 

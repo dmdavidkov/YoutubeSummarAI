@@ -5,145 +5,334 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Summary with Phind</title>
   <style>
-    /* Default styles */
     :root {
       --bg-color: var(--yt-spec-base-background);
       --text-color: var(--yt-spec-text-primary);
       --blockquote-bg: rgba(255, 255, 255, 0.1);
-      --key-point-bg: rgba(0, 123, 255, 0.1);
+      --key-point-bg: rgba(0, 123, 255, 0.08);
       --heading-color: var(--yt-spec-text-primary);
       --link-color: #007bff;
       --border-color: #007bff;
+      --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      --button-hover: rgba(0, 123, 255, 0.1);
+      --accent-gradient: linear-gradient(135deg, #007bff, #00a6ff);
+      --error-color: #dc3545;
+      --success-color: #28a745;
+      --link-color-light: #1a8fff;
+      --link-color-dark: #66b3ff;
     }
 
     body {
       margin: 0;
       padding: 20px;
       background-color: var(--bg-color, #ffffff);
-      font-family: 'Roboto', sans-serif;
-      color: var(--text-color, #0F0F0F);
-      width: 35vw;
-      min-width: 350px;
-      max-width: 600px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell, sans-serif;
+      color: var(--text-color);
+      width: 45vw;
+      min-width: 400px;
+      max-width: 800px;
       font-size: 18px;
+      line-height: 1.5;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .card {
+      background-color: transparent;
+      border-radius: 16px;
+      padding: 0;
+      position: relative;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      border: none;
+      backdrop-filter: none;
+    }
+
+    .card:hover {
+      transform: none;
+      box-shadow: none;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-bottom: 20px;
+      opacity: 0.9;
+    }
+
+    .icon-button {
+      background: none;
+      border: none;
+      color: var(--text-color);
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 50%;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+    }
+
+    .icon-button:hover {
+      background-color: var(--button-hover);
+      transform: scale(1.1);
+    }
+
+    .icon-button:active {
+      transform: scale(0.95);
+    }
+
+    .icon-button svg {
+      width: 20px;
+      height: 20px;
+      fill: currentColor;
+      transition: fill 0.2s ease;
+    }
+
+    #generateSummaryBtn {
+      padding: 14px 28px;
+      font-size: 18px;
+      font-weight: 500;
+      background: var(--accent-gradient);
+      color: #fff;
+      border: none;
+      border-radius: 30px;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      display: block;
+      margin: 0 auto 30px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 15px rgba(0, 123, 255, 0.2);
+    }
+
+    #generateSummaryBtn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 123, 255, 0.3);
+    }
+
+    #generateSummaryBtn:active {
+      transform: scale(0.98);
     }
 
     #summary {
       font-size: 18px;
-      line-height: 1.6;
-      color: var(--text-color, #0F0F0F);
-    }
-
-    #summary h1, #summary h2, #summary h3 {
-      color: var(--heading-color, #0F0F0F);
+      line-height: 1.5;
+      color: var(--text-color);
+      opacity: 0;
+      transform: translateY(20px);
+      animation: fadeInUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
     }
 
     #summary h1 {
-      font-size: 2.5rem;
+      font-size: 2.2rem;
       font-weight: 600;
-      line-height: 2.7rem;
-      margin-top: 30px;
-      margin-bottom: 15px;
+      line-height: 1.3;
+      margin: 24px 0 16px;
+      padding-bottom: 12px;
       border-bottom: 2px solid var(--border-color);
-      padding-bottom: 10px;
+      background: var(--accent-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
 
     #summary h2 {
-      font-size: 2.2rem;
-      font-weight: 600;
-      line-height: 2.4rem;
-      margin-top: 25px;
-      margin-bottom: 10px;
+      font-size: 1.8rem;
+      margin: 20px 0 12px;
+      color: var(--heading-color);
     }
 
     #summary h3 {
-      font-size: 1.9rem;
-      font-weight: 600;
-      line-height: 2.1rem;
-      margin-top: 20px;
-      margin-bottom: 10px;
+      font-size: 1.5rem;
+      margin: 16px 0 10px;
+      color: var(--heading-color);
     }
 
-    #summary p, #summary ul, #summary ol {
-      margin-bottom: 15px;
-      color: var(--text-color, #0F0F0F);
+    #summary p {
+      font-size: 18px;
+      margin-bottom: 14px;
+      color: var(--text-color);
     }
 
     #summary ul, #summary ol {
-      padding-left: 40px;
+      padding-left: 24px;
+      margin-bottom: 14px;
+      list-style: none;
     }
 
-    #summary li {
-      margin-bottom: 8px;
-      color: var(--text-color, #0F0F0F);
+    #summary ul li {
+      margin-bottom: 6px;
+      position: relative;
+      padding-left: 20px;
+    }
+
+    #summary ul > li::before {
+      content: '•';
+      position: absolute;
+      left: 0;
+      color: var(--link-color);
+      font-size: 20px;
+      line-height: 1;
+      top: 2px;
+    }
+
+    #summary ul ul > li::before {
+      content: '◦';
+      font-size: 18px;
+      top: 3px;
+    }
+
+    #summary ul ul ul > li::before {
+      content: '▪';
+      font-size: 12px;
+      top: 6px;
+    }
+
+    #summary ol {
+      counter-reset: item;
+      padding-left: 24px;
+    }
+
+    #summary ol li {
+      counter-increment: item;
+      margin-bottom: 6px;
+      position: relative;
+      padding-left: 20px;
+    }
+
+    #summary ol > li::before {
+      content: counter(item) ".";
+      position: absolute;
+      left: -5px;
+      color: var(--link-color);
+      font-weight: 500;
+    }
+
+    .key-point {
+      background-color: var(--key-point-bg);
+      border-left: 4px solid var(--link-color);
+      padding: 12px 16px;
+      margin: 14px 0;
+      border-radius: 0 8px 8px 0;
+      box-shadow: 0 2px 4px rgba(0, 123, 255, 0.1);
+    }
+
+    .timestamp {
+      font-weight: 500;
+      color: var(--link-color);
+      background-color: var(--key-point-bg);
+      padding: 4px 8px;
+      border-radius: 4px;
+      margin-right: 6px;
+      transition: all 0.2s ease;
+      display: inline-block;
+    }
+
+    .timestamp:hover {
+      background-color: var(--link-color);
+      color: white;
+      transform: translateY(-1px);
+    }
+
+    blockquote {
+      margin: 14px 0;
+      padding: 12px 24px;
+      background-color: var(--blockquote-bg);
+      border-left: 4px solid var(--border-color);
+      border-radius: 0 8px 8px 0;
+      font-style: italic;
+    }
+
+    .spinner {
+      border: 3px solid rgba(0, 123, 255, 0.1);
+      border-top: 3px solid var(--link-color);
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 24px auto;
+    }
+
+    .error-message {
+      color: var(--error-color);
+      text-align: center;
+      padding: 16px;
+      border-radius: 8px;
+      background-color: rgba(220, 53, 69, 0.1);
+      margin: 16px 0;
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .tooltip {
+      position: fixed;
+      background: var(--bg-color);
+      color: var(--text-color);
+      padding: 8px 16px;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      font-size: 14px;
+      font-weight: 500;
+      z-index: 10000;
+      opacity: 0;
+      transform: translateY(-8px);
+      animation: tooltipFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+
+    @keyframes tooltipFadeIn {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .card {
+        background-color: transparent;
+      }
+      
+      #summary a {
+        color: var(--link-color-dark);
+      }
+
+      .timestamp {
+        color: var(--link-color-dark);
+      }
+
+      .timestamp:hover {
+        background-color: var(--link-color-dark);
+      }
     }
 
     #summary a {
-      color: var(--link-color);
+      color: var(--link-color-light);
       text-decoration: none;
+      transition: color 0.2s ease;
     }
 
     #summary a:hover {
       text-decoration: underline;
     }
 
-    blockquote {
-      margin: 0 0 15px;
-      padding: 10px 20px;
-      background-color: var(--blockquote-bg);
-      border-left: 5px solid var(--border-color);
-      font-style: italic;
-      color: var(--text-color, #0F0F0F);
-    }
-
-    .key-point {
-      background-color: var(--key-point-bg);
-      border-left: 3px solid var(--border-color);
-      padding: 10px;
-      margin-bottom: 15px;
-      color: var(--text-color, #0F0F0F);
-    }
-
-    #generateSummaryBtn {
-      padding: 12px 24px;
-      font-size: 20px;
-      background-color: #007bff;
-      color: #fff;
-      border: none;
-      border-radius: 30px;
-      cursor: pointer;
-      transition: background-color 0.3s ease, transform 0.3s ease;
-      display: block;
-      margin: 0 auto 30px;
-    }
-
-    #generateSummaryBtn:hover {
-      background-color: #0056b3;
-      transform: scale(1.05);
-    }
-
-    .timestamp {
-      font-weight: bold;
-      color: var(--link-color);
-      background-color: var(--key-point-bg);
-      padding: 2px 6px;
-      border-radius: 4px;
-      margin-right: 5px;
-      transition: background-color 0.3s ease;
-    }
-
-    .error {
-      color: #ff0000;
-      font-weight: bold;
-    }
-
-    .loading {
-      color: var(--link-color);
-      font-style: italic;
-    }
-
-    .hidden {
-      display: none !important;
+    #optionsBtn svg {
+      width: 22px;
+      height: 22px;
     }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -151,29 +340,29 @@
     function copyYouTubeTheme() {
       try {
         if (window.self !== window.top) {
-          // Get computed styles from YouTube
           const youtubeStyles = window.getComputedStyle(window.parent.document.documentElement);
           const backgroundColor = youtubeStyles.getPropertyValue('--yt-spec-base-background');
           const textColor = youtubeStyles.getPropertyValue('--yt-spec-text-primary');
           
-          // Apply YouTube's colors to our document
           document.documentElement.style.setProperty('--bg-color', backgroundColor);
           document.documentElement.style.setProperty('--text-color', textColor);
           document.documentElement.style.setProperty('--heading-color', textColor);
+          
+          // Adjust card shadow based on theme
+          const isDark = backgroundColor.includes('rgb(15') || backgroundColor.includes('#0f');
+          document.documentElement.style.setProperty('--card-shadow', 
+            isDark ? '0 4px 6px rgba(255, 255, 255, 0.1)' : '0 4px 6px rgba(0, 0, 0, 0.1)');
         }
       } catch (e) {
         console.error('Could not access parent frame:', e);
-        // Fallback to light theme
         document.documentElement.style.setProperty('--bg-color', '#ffffff');
         document.documentElement.style.setProperty('--text-color', '#0F0F0F');
         document.documentElement.style.setProperty('--heading-color', '#0F0F0F');
       }
     }
 
-    // Run theme copy when the page loads
     document.addEventListener('DOMContentLoaded', copyYouTubeTheme);
 
-    // Watch for theme changes
     if (window.self !== window.top) {
       try {
         const observer = new MutationObserver(copyYouTubeTheme);
@@ -188,9 +377,28 @@
   </script>
 </head>
 <body>
-  <button id="generateSummaryBtn">Generate Summary</button>
-  <div id="summary">
-    <!-- Summary content will be inserted here -->
+  <div class="card">
+    <div class="card-header">
+      <button class="icon-button" id="optionsBtn" title="Open options">
+        <svg viewBox="0 0 24 24">
+          <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.03-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+        </svg>
+      </button>
+      <button class="icon-button" id="copyBtn" title="Copy summary">
+        <svg viewBox="0 0 24 24" id="copyBtn">
+          <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+        </svg>
+      </button>
+      <button class="icon-button" id="closeBtn" title="Close summary">
+        <svg viewBox="0 0 24 24">
+          <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+        </svg>
+      </button>
+    </div>
+    <button id="generateSummaryBtn">Generate Summary</button>
+    <div id="summary">
+      <!-- Summary content will be inserted here -->
+    </div>
   </div>
 </body>
 </html>
