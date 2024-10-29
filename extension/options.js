@@ -11,6 +11,7 @@ chrome.storage.sync.get(null, (items) => {
         transcriptionMethod: items.transcriptionMethod || '',
         processLocally: items.processLocally || false,
         logConversations: items.logConversations || false,
+        keepWindowActive: items.keepWindowActive || false,
         providers: items.providers || {}
     };
 
@@ -27,6 +28,7 @@ function initializeOptions() {
     const transcriptionMethodSelect = document.getElementById('transcriptionMethod');
     const processLocallySelect = document.getElementById('processLocally');
     const logConversationsSelect = document.getElementById('logConversations');
+    const keepWindowActiveSelect = document.getElementById('keepWindowActive');
 
     // Check if elements exist before setting values
     if (backendUrlInput) {
@@ -48,6 +50,10 @@ function initializeOptions() {
     if (logConversationsSelect) {
         logConversationsSelect.value = settings.logConversations.toString();
         console.log("Set logConversations:", logConversationsSelect.value);
+    }
+    if (keepWindowActiveSelect) {
+        keepWindowActiveSelect.value = settings.keepWindowActive.toString();
+        console.log("Set keepWindowActive:", keepWindowActiveSelect.value);
     }
 
     // Generate provider settings
@@ -186,6 +192,7 @@ function saveOptions() {
         processLocally: document.getElementById('processLocally')?.value === 'true',
         logConversations: document.getElementById('logConversations')?.value === 'true',
         backendUrl: document.getElementById('backendUrl')?.value,
+        keepWindowActive: document.getElementById('keepWindowActive')?.value === 'true',
         providers: {}
     };
 

@@ -52,6 +52,27 @@
                 case 'updateSummaryContent':
                     updateSummaryContent(request.content, request.isLoading, request.isError);
                     break;
+                case 'getContent':
+                    const resultElement = document.querySelector(providerSettings[request.provider].resultSelector);
+                    const content = resultElement ? resultElement.innerHTML : '';
+                    sendResponse({ content: content });
+                    break;
+                case 'copyContent':
+                    const textArea = document.createElement('textarea');
+                    textArea.value = request.content;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    try {
+                        document.execCommand('copy');
+                        console.log('Content copied successfully');
+                    } catch (err) {
+                        console.error('Failed to copy content:', err);
+                    }
+                    document.body.removeChild(textArea);
+                    break;
+                case 'closeTab':
+                    closeNewTab(request.prompt, request.content);
+                    break;
             }
 
             // Send an immediate response
@@ -190,14 +211,25 @@
     }
 
     function handleAnchorClick(event) {
-        if (event.target.tagName === 'A') {
+        console.log('Click detected');
+        const anchorElement = event.target.closest('a');
+        if (anchorElement) {
+            console.log('Anchor tag found:', anchorElement);
             event.preventDefault();
-            const url = new URL(event.target.href);
-            const timeParam = url.searchParams.get('t');
-            chrome.runtime.sendMessage({
-                action: 'seekToTimeEx',
-                time: timeParam
-            });
+            
+            // Get the href and decode it if needed
+            const href = decodeURIComponent(anchorElement.href);
+            const youtubeUrlMatch = href.match(/https?:\/\/(?:www\.)?youtube\.com\/watch\?.*?t=(\d+)/);
+            
+            if (youtubeUrlMatch && youtubeUrlMatch[1]) {
+                const timeParam = youtubeUrlMatch[1];
+                chrome.runtime.sendMessage({
+                    action: 'seekToTimeEx',
+                    time: timeParam
+                });
+            } else {
+                console.log('No valid YouTube timestamp found in URL:', href);
+            }
         }
     }
 
@@ -329,13 +361,15 @@
                     if (divElement) {
                         const divContent = divElement.innerHTML;
                         if (divContent !== previousDivContent) {
-                            chrome.runtime.sendMessage({ action: 'divContent', content: divContent });
+                            chrome.runtime.sendMessage({ 
+                                action: 'divContent', 
+                                content: divContent 
+                            });
                             previousDivContent = divContent;
                             mutationCount++;
                             lastMutationTime = Date.now();
                             resetTimer();
 
-                            // Notify that content is being updated
                             chrome.runtime.sendMessage({ action: 'contentUpdating' });
                         }
                     } else {

@@ -11,7 +11,7 @@ const DEFAULT_SETTINGS = {
             url: 'https://you.com/?chatMode=custom',
             inputSelector: '#search-input-textarea',
             buttonSelector: 'button[type="submit"]',
-            confirmButtonSelector: '[data-eventactionname="file_upload_modal_attach"]', 
+            confirmButtonSelector: '[data-eventactionname="save_sources_modal"]', 
             resultSelector: '[data-testid="youchat-answer-turn-0"]'
         },
         perplexity: {
@@ -166,42 +166,41 @@ function forwardMessageToYouTubeTabs(message) {
     });
 }
 
-// Updated closeNewTab function
-function closeNewTab(prompt, clipboard) {
+// Update these constants
+const INITIAL_CHECK_DELAY = 5000; // 5 seconds
+const CHECK_INTERVAL = 1000; // 1 second
+const MAX_WAIT_TIME = 60000; // 60 seconds
+const MIN_CONTENT_LENGTH = 300; // Minimum length
+const CONTENT_STABLE_TIME = 3000; // 3 seconds of stable content
+
+// Add this state tracking object
+const windowState = {
+    lastContent: '',
+    contentStableTime: 0,
+    checkInterval: null,
+    startTime: 0
+};
+
+// Replace the existing closeNewTab function with this improved version
+function closeNewTab(prompt, content) {
     if (newTabId !== null) {
-        console.log("Closing tab with ID:", newTabId);
         chrome.tabs.remove(newTabId, () => {
             if (chrome.runtime.lastError) {
                 console.error('Error closing tab:', chrome.runtime.lastError);
-            } else {
-                console.log('Tab closed successfully.');
-                newTabId = null;
+                setTimeout(() => chrome.tabs.remove(newTabId), 500);
             }
+            newTabId = null;
         });
-    } else {
-        console.warn("No tab ID to close.");
     }
 
-    // Check if logging conversations is enabled before saving the result
+    // Handle logging if enabled
     chrome.storage.sync.get(['backendUrl', 'logConversations'], function(items) {
-        const backendUrl = items.backendUrl;
-        const logConversations = items.logConversations;
-        
-        if (logConversations) {
-            fetch(`${backendUrl}/save_result`, {
+        if (items.logConversations && content) {
+            fetch(`${items.backendUrl}/save_result`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: prompt, result: clipboard })
-            }).then(response => {
-                if (!response.ok) throw new Error('Network response was not ok');
-                return response.json();
-            }).then(data => {
-                console.log('Result saved successfully:', data);
-            }).catch(error => {
-                console.error('Error saving result:', error);
-            });
-        } else {
-            console.log('Logging conversations is disabled. Result not saved.');
+                body: JSON.stringify({ prompt: prompt, result: content })
+            }).catch(error => console.error('Error saving result:', error));
         }
     });
 }
@@ -210,6 +209,7 @@ function closeNewTab(prompt, clipboard) {
 function seekToTimeInYouTubeTab(time) {
     chrome.tabs.query({ url: "https://www.youtube.com/*" }, (tabs) => {
         tabs.forEach(tab => {
+            console.log('Seeking to time in YouTube tab:', time);
             chrome.tabs.sendMessage(tab.id, { action: 'seekToTimeEx', time: time });
         });
     });
@@ -325,9 +325,10 @@ function setupKeepAliveInterval(fetchPromise) {
 
 // Open AI provider and paste prompt
 function openAIProviderAndPastePrompt(prompt, videoUrl) {
-    chrome.storage.sync.get(['aiProvider', 'providers'], function(items) {
+    chrome.storage.sync.get(['aiProvider', 'providers', 'keepWindowActive'], function(items) {
         const provider = items.aiProvider;
         const providerSettings = items.providers[provider];
+        const keepWindowActive = items.keepWindowActive;
         
         chrome.windows.getCurrent({}, (currentWindow) => {
             const width = 10;
@@ -347,27 +348,33 @@ function openAIProviderAndPastePrompt(prompt, videoUrl) {
                 const tab = window.tabs[0];
                 newTabId = tab.id;
                 
-                // Set up a listener for the focus change event
-                const focusListener = (windowId) => {
-                    if (windowId !== window.id) {
-                        // If the focus changed to a different window, try to focus our window again
-                        chrome.windows.update(window.id, {focused: true}, () => {
-                            if (chrome.runtime.lastError) {
-                                console.error('Error focusing window:', chrome.runtime.lastError);
-                            }
-                        });
-                    }
-                };
+                // Start monitoring for window close
+                startWindowCloseMonitoring(tab.id, provider);
 
-                chrome.windows.onFocusChanged.addListener(focusListener);
+                // Only set up the focus listener if keepWindowActive is true
+                if (keepWindowActive) {
+                    // Set up a listener for the focus change event
+                    const focusListener = (windowId) => {
+                        if (windowId !== window.id) {
+                            // If the focus changed to a different window, try to focus our window again
+                            chrome.windows.update(window.id, {focused: true}, () => {
+                                if (chrome.runtime.lastError) {
+                                    console.error('Error focusing window:', chrome.runtime.lastError);
+                                }
+                            });
+                        }
+                    };
 
-                // Set up a listener to remove the focus listener when the window is closed
-                chrome.windows.onRemoved.addListener(function windowRemovedListener(removedWindowId) {
-                    if (removedWindowId === window.id) {
-                        chrome.windows.onFocusChanged.removeListener(focusListener);
-                        chrome.windows.onRemoved.removeListener(windowRemovedListener);
-                    }
-                });
+                    chrome.windows.onFocusChanged.addListener(focusListener);
+
+                    // Set up a listener to remove the focus listener when the window is closed
+                    chrome.windows.onRemoved.addListener(function windowRemovedListener(removedWindowId) {
+                        if (removedWindowId === window.id) {
+                            chrome.windows.onFocusChanged.removeListener(focusListener);
+                            chrome.windows.onRemoved.removeListener(windowRemovedListener);
+                        }
+                    });
+                }
 
                 // Wait for the tab to finish loading
                 chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
@@ -469,5 +476,102 @@ function injectContentScriptForCustomProvider(tab) {
       }
     }
   });
+}
+
+// Add this function to handle clipboard operations
+async function copyToClipboardInBackground(text) {
+    // Create a temporary textarea element
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    document.body.appendChild(textarea);
+    
+    try {
+        // Select and copy the text
+        textarea.select();
+        document.execCommand('copy');
+        return true;
+    } catch (error) {
+        console.error('Error copying to clipboard:', error);
+        return false;
+    } finally {
+        document.body.removeChild(textarea);
+    }
+}
+
+// Add these new functions for improved window management
+function startWindowCloseMonitoring(tabId, provider) {
+    // Reset state
+    windowState.lastContent = '';
+    windowState.contentStableTime = 0;
+    windowState.startTime = Date.now();
+    
+    // Store provider in windowState
+    windowState.provider = provider;
+    
+    // Clear any existing interval
+    if (windowState.checkInterval) {
+        clearInterval(windowState.checkInterval);
+    }
+
+    // Initial delay before starting checks
+    setTimeout(() => {
+        windowState.checkInterval = setInterval(() => {
+            checkWindowContent(tabId);
+        }, CHECK_INTERVAL);
+    }, INITIAL_CHECK_DELAY);
+
+    // Set maximum wait time
+    setTimeout(() => {
+        if (windowState.checkInterval) {
+            clearInterval(windowState.checkInterval);
+            forceCloseWindow(tabId);
+        }
+    }, MAX_WAIT_TIME);
+}
+
+function checkWindowContent(tabId) {
+    chrome.tabs.sendMessage(tabId, { 
+        action: 'getContent',
+        provider: windowState.provider
+    }, (response) => {
+        if (chrome.runtime.lastError || !response) {
+            console.log('Error getting content:', chrome.runtime.lastError);
+            return;
+        }
+
+        const currentContent = response.content;
+        
+        if (currentContent === windowState.lastContent && 
+            currentContent.length > MIN_CONTENT_LENGTH) {
+            
+            if (!windowState.contentStableTime) {
+                windowState.contentStableTime = Date.now();
+            }
+            
+            if (Date.now() - windowState.contentStableTime > CONTENT_STABLE_TIME) {
+                clearInterval(windowState.checkInterval);
+                
+                // Send content to YouTube tab using divContent action instead
+                forwardMessageToYouTubeTabs({ 
+                    action: 'divContent', 
+                    content: currentContent 
+                });
+
+                // Then close the tab directly
+                if (newTabId !== null) {
+                    chrome.tabs.remove(newTabId, () => {
+                        if (chrome.runtime.lastError) {
+                            console.error('Error closing tab:', chrome.runtime.lastError);
+                            setTimeout(() => chrome.tabs.remove(newTabId), 500);
+                        }
+                        newTabId = null;
+                    });
+                }
+            }
+        } else {
+            windowState.lastContent = currentContent;
+            windowState.contentStableTime = 0;
+        }
+    });
 }
 
