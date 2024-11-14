@@ -27,10 +27,18 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
 
 - `YoutubeSummarAI/`: Main project directory
   - `backend/`: Backend Python service
+    - `main.py`: Main service implementation
+    - `run_llama.py`: Local AI model integration
+    - `run_gemini.py`: Google Gemini integration
+    - `prompt_template.txt`: Template for AI interactions
+    - `.env.example`: Example environment configuration
+    - `requirements.txt`: Python dependencies
   - `extension/`: Chrome extension
     - `background.js`: Service worker for extension functionality
     - `content.js`: YouTube page integration
     - `popup.html`: Extension UI
+    - `options.html`, `options.js`: Extension configuration interface
+    - `marked.js`: Markdown rendering support
     - Other extension resources
 
 ## Installation
@@ -54,9 +62,9 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
    pip install -r requirements.txt
    ```
 5. Set up environment variables:
-   - Create a `.env` file in the `backend` directory
-   - Add necessary API keys (refer to `backend/.env.example`)
-   - For local AI processing, place the Llama 3.1 GGUF model file in the `backend` directory
+   - Create a `.env` file in the `backend` directory (use `.env.example` as a template)
+   - Add necessary API keys
+   - For local AI processing, place the Qwen 2.5 7B GGUF model file in the `backend` directory
 
 6. Run the backend service:
    - Ad-hoc mode: `python main.py`
@@ -92,12 +100,12 @@ YoutubeSummarAI is an advanced tool that leverages cutting-edge AI technology to
    - Remote (uses AI provider)
 
 4. **AI Providers**:
-   - Built-in support:
-     - You.com
-     - Perplexity
-     - Phind
-     - Google Gemini
-     - ChatGPT
+   - Built-in support with direct URL integration:
+     - You.com (you.com)
+     - Perplexity (perplexity.ai)
+     - Phind (phind.com)
+     - Google Gemini (aistudio.google.com)
+     - ChatGPT (chatgpt.com)
    - Custom provider support with configurable:
      - URL
      - Input field selector
@@ -134,9 +142,9 @@ or on windows you can also use Chocolatey (https://chocolatey.org/):
 
 ## Considerations for Local summarization using llama.cpp
 
-1. You can place the model in the /backend folder in gguf format or let the code download the model from HF. 
+1. You can place the model in the /backend folder in gguf format or let the code download the model from HF. The default model is Qwen 2.5 7B.
 
-2. Currently the setup is for Qwen2.5 7B model. If you want you can use another model, but you need to go to run_llama.py and update the repo/modelname, response (the stop token) and chat template variables. 
+2. The setup is configured for the Qwen 2.5 7B model in Q5_K_M quantization. If you want to use another model, you need to update the repo/modelname, response (the stop token) and chat template variables in run_llama.py.
 
 3. The project utilizes https://github.com/abetlen/llama-cpp-python library. If you want a NVIDIA/CUDA GPU acceleration refer to https://github.com/abetlen/llama-cpp-python?tab=readme-ov-file#supported-backends
 
@@ -183,4 +191,3 @@ This project is licensed under the [MIT License](LICENSE).
 ## Contact
 
 For questions, suggestions, or collaborations, please open an issue on this repository.
-
