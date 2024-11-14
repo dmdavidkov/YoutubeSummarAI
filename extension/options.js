@@ -119,8 +119,6 @@ function handleProviderChange() {
     if (aiProvider) {
         showProviderSettings(aiProvider);
         showSelectorStatus(`${aiProvider} provider selected`, 'success', 2000);
-    } else {
-        showSelectorStatus('Please select a provider', 'error', 2000);
     }
 }
 
@@ -138,11 +136,27 @@ function showProviderSettings(provider) {
 
 function handleProcessLocallyChange() {
     const processLocally = document.getElementById('processLocally').value === 'true';
+    const aiConfigSection = document.querySelector('.section:nth-child(2)'); // AI Configuration section
+    const aiProviderSelect = document.getElementById('aiProvider');
     const aiProviderSection = document.getElementById('aiProviderSection');
-    aiProviderSection.style.display = processLocally ? 'none' : 'block';
-    
-    if (processLocally) {
-        showStatus('Local processing enabled - AI provider settings hidden', 'success', 2000);
+
+    // Disable or enable the entire AI Configuration section
+    if (aiConfigSection) {
+        if (processLocally) {
+            aiConfigSection.style.opacity = '0.5';
+            aiConfigSection.style.pointerEvents = 'none';
+            aiProviderSelect.disabled = true;
+            showStatus('Local processing enabled - AI provider settings disabled', 'success', 2000);
+        } else {
+            aiConfigSection.style.opacity = '1';
+            aiConfigSection.style.pointerEvents = 'auto';
+            aiProviderSelect.disabled = false;
+        }
+    }
+
+    // Hide or show the provider settings
+    if (aiProviderSection) {
+        aiProviderSection.style.display = processLocally ? 'none' : 'block';
     }
 }
 

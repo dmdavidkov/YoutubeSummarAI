@@ -6,142 +6,168 @@
     <title>YouTube Summary Generator Options</title>
     <style>
         :root {
-            --primary-color: #4CAF50;
-            --primary-hover: #45a049;
-            --text-color: #333;
-            --border-color: #ddd;
-            --background-light: #f0f0f0;
-            --background-white: #fff;
+            --primary-color: #FF0000;
+            --primary-hover: #cc0000;
+            --background-dark: #1a1a1a;
+            --background-card: #242424;
+            --text-color: #e0e0e0;
+            --text-secondary: #a0a0a0;
+            --border-color: #333333;
+            --shadow-color: rgba(0, 0, 0, 0.3);
+            --input-background: #2a2a2a;
+            --success-color: #4CAF50;
+            --error-color: #f44336;
         }
 
         body {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            background-color: var(--background-light);
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+            background-color: var(--background-dark);
             margin: 0;
-            padding: 15px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
+            padding: 0;
             color: var(--text-color);
+            min-height: 100vh;
         }
 
         .container {
-            background-color: var(--background-white);
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            max-width: 500px;
+            background-color: var(--background-card);
+            padding: 40px;
+            width: 100%;
+            box-sizing: border-box;
+            min-height: 100vh;
+        }
+
+        .content-wrapper {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 0 40px;
+        }
+
+        #optionsForm {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 30px;
             width: 100%;
         }
 
         h1 {
             color: var(--text-color);
-            margin: 0 0 20px 0;
-            font-size: 20px;
+            margin: 0 0 40px 0;
+            font-size: 28px;
             text-align: center;
-            padding-bottom: 12px;
-            border-bottom: 2px solid var(--background-light);
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--border-color);
+            position: relative;
+            grid-column: 1 / -1;
         }
 
         .section {
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid var(--background-light);
-        }
-
-        .section:last-child {
-            border-bottom: none;
-            margin-bottom: 15px;
+            background-color: var(--background-dark);
+            padding: 25px;
+            border-radius: 8px;
+            margin-bottom: 0;
+            transition: opacity 0.3s ease;
         }
 
         label {
             display: block;
-            margin-bottom: 4px;
+            margin-bottom: 8px;
             color: var(--text-color);
             font-weight: 500;
-            font-size: 13px;
+            font-size: 14px;
         }
 
         select, input[type="text"] {
             width: 100%;
-            padding: 8px;
-            margin-bottom: 12px;
+            padding: 12px;
+            margin-bottom: 15px;
             border: 1px solid var(--border-color);
-            border-radius: 6px;
-            background-color: var(--background-white);
-            font-size: 13px;
+            border-radius: 8px;
+            background-color: var(--input-background);
+            color: var(--text-color);
+            font-size: 14px;
             box-sizing: border-box;
-            transition: border-color 0.3s, box-shadow 0.3s;
+            transition: border-color 0.2s;
+        }
+
+        select:hover, input[type="text"]:hover {
+            border-color: var(--primary-color);
         }
 
         select:focus, input[type="text"]:focus {
             outline: none;
             border-color: var(--primary-color);
-            box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
+        }
+
+        select option {
+            background-color: var(--background-card);
+            color: var(--text-color);
+        }
+
+        select optgroup {
+            background-color: var(--background-card);
+            color: var(--text-secondary);
+        }
+
+        select:disabled {
+            background-color: var(--background-dark);
+            cursor: not-allowed;
         }
 
         button {
             background-color: var(--primary-color);
             color: white;
-            padding: 10px 20px;
+            padding: 12px 24px;
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            width: 100%;
-            transition: background-color 0.3s, transform 0.1s;
+            font-size: 15px;
+            font-weight: 600;
+            transition: background-color 0.2s;
         }
 
         button:hover {
             background-color: var(--primary-hover);
         }
 
-        button:active {
-            transform: scale(0.98);
+        #saveButton {
+            grid-column: 1 / -1;
+            max-width: 300px;
+            justify-self: center;
+            margin-top: 30px;
         }
 
-        /* Updated status message styling */
         #status, #selectorStatus {
+            grid-column: 1 / -1;
+            max-width: 600px;
+            justify-self: center;
             margin-top: 15px;
             padding: 10px;
             border-radius: 6px;
             font-size: 13px;
-            transition: all 0.3s ease;
+            transition: opacity 0.2s;
             opacity: 0;
-            transform: translateY(-10px);
         }
 
         #status.show, #selectorStatus.show {
             opacity: 1;
-            transform: translateY(0);
         }
 
         #status.success, #selectorStatus.success {
-            background-color: rgba(76, 175, 80, 0.1);
-            color: var(--primary-color);
-            border-left: 4px solid var(--primary-color);
+            background-color: rgba(76, 175, 80, 0.2);
+            color: var(--success-color);
+            border-left: 4px solid var(--success-color);
         }
 
         #status.error, #selectorStatus.error {
-            background-color: rgba(244, 67, 54, 0.1);
-            color: #f44336;
-            border-left: 4px solid #f44336;
-        }
-
-        /* Loading animation for status messages */
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.6; }
-            100% { opacity: 1; }
+            background-color: rgba(244, 67, 54, 0.2);
+            color: var(--error-color);
+            border-left: 4px solid var(--error-color);
         }
 
         #status.loading, #selectorStatus.loading {
-            background-color: rgba(33, 150, 243, 0.1);
+            background-color: rgba(33, 150, 243, 0.2);
             color: #2196f3;
             border-left: 4px solid #2196f3;
-            animation: pulse 1.5s infinite;
         }
 
         .provider-settings {
@@ -153,86 +179,115 @@
             display: block;
         }
 
-        /* New styles for sections */
         .section-title {
-            font-size: 14px;
+            font-size: 16px;
             font-weight: 600;
-            margin-bottom: 10px;
-            color: var(--text-color);
+            margin-bottom: 15px;
+            color: var(--text-secondary);
+        }
+
+        @media (max-width: 1400px) {
+            #optionsForm {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 1100px) {
+            #optionsForm {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .content-wrapper {
+                padding: 0 20px;
+            }
+            
+            #optionsForm {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            h1 {
+                font-size: 24px;
+                margin-bottom: 30px;
+            }
         }
     </style>
     <script src="options.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1>YouTube Summary Generator Options</h1>
-        
-        <form id="optionsForm">
-            <div class="section">
-                <div class="section-title">Connection Settings</div>
-                <label for="backendUrl">Backend URL:</label>
-                <input type="text" id="backendUrl" name="backendUrl" placeholder="Enter backend URL">
-            </div>
-
-            <div class="section">
-                <div class="section-title">AI Configuration</div>
-                <label for="aiProvider">AI Provider:</label>
-                <select id="aiProvider" name="aiProvider">
-                    <!-- Options will be dynamically populated -->
-                </select>
-
-                <div id="aiProviderSection">
-                    <!-- Provider settings will be dynamically generated here -->
+        <div class="content-wrapper">
+            <h1>YouTube Summary Generator Options</h1>
+            
+            <form id="optionsForm">
+                <div class="section">
+                    <div class="section-title">Connection Settings</div>
+                    <label for="backendUrl">Backend URL:</label>
+                    <input type="text" id="backendUrl" name="backendUrl" placeholder="Enter backend URL">
                 </div>
-            </div>
 
-            <div class="section">
-                <div class="section-title">Transcription Settings</div>
-                <label for="transcriptionMethod">Transcription Method:</label>
-                <select id="transcriptionMethod">
-                    <option value="youtube">YouTube API</option>
-                    <optgroup label="Whisper Models">
-                        <option value="whisper:base">Base</option>
-                        <option value="whisper:base.en">Base English</option>
-                        <option value="whisper:tiny">Tiny</option>
-                        <option value="whisper:tiny.en">Tiny English</option>
-                        <option value="whisper:small">Small</option>
-                        <option value="whisper:small.en">Small English</option>
-                        <option value="whisper:medium">Medium</option>
-                        <option value="whisper:medium.en">Medium English</option>
-                        <option value="whisper:large">Large</option>
-                        <option value="whisper:large-v3">Large v3</option>
-                        <option value="whisper:deepdml/faster-whisper-large-v3-turbo-ct2">Turbo</option>
-                    </optgroup>
-                </select>
-            </div>
+                <div class="section">
+                    <div class="section-title">AI Configuration</div>
+                    <label for="aiProvider">AI Provider:</label>
+                    <select id="aiProvider" name="aiProvider">
+                        <!-- Options will be dynamically populated -->
+                    </select>
 
-            <div class="section">
-                <div class="section-title">Additional Options</div>
-                <label for="processLocally">Process Locally:</label>
-                <select id="processLocally">
-                    <option value="false">No</option>
-                    <option value="true">Yes</option>
-                </select>
+                    <div id="aiProviderSection">
+                        <!-- Provider settings will be dynamically generated here -->
+                    </div>
+                </div>
 
-                <label for="logConversations">Log Conversations:</label>
-                <select id="logConversations">
-                    <option value="false">No</option>
-                    <option value="true">Yes</option>
-                </select>
+                <div class="section">
+                    <div class="section-title">Transcription Settings</div>
+                    <label for="transcriptionMethod">Transcription Method:</label>
+                    <select id="transcriptionMethod">
+                        <option value="youtube">YouTube API</option>
+                        <optgroup label="Whisper Models">
+                            <option value="whisper:base">Base</option>
+                            <option value="whisper:base.en">Base English</option>
+                            <option value="whisper:tiny">Tiny</option>
+                            <option value="whisper:tiny.en">Tiny English</option>
+                            <option value="whisper:small">Small</option>
+                            <option value="whisper:small.en">Small English</option>
+                            <option value="whisper:medium">Medium</option>
+                            <option value="whisper:medium.en">Medium English</option>
+                            <option value="whisper:large">Large</option>
+                            <option value="whisper:large-v3">Large v3</option>
+                            <option value="whisper:deepdml/faster-whisper-large-v3-turbo-ct2">Turbo</option>
+                        </optgroup>
+                    </select>
+                </div>
 
-                <label for="keepWindowActive">Keep Window Active (try if generation is slow or doesn't work):</label>
-                <select id="keepWindowActive">
-                    <option value="false">No</option>
-                    <option value="true">Yes</option>
-                </select>
-            </div>
+                <div class="section">
+                    <div class="section-title">Additional Options</div>
+                    <label for="processLocally">Process Locally:</label>
+                    <select id="processLocally">
+                        <option value="false">No</option>
+                        <option value="true">Yes</option>
+                    </select>
 
-            <button type="button" id="saveButton">Save Settings</button>
-        </form>
-        
-        <div id="status"></div>
-        <div id="selectorStatus"></div>
+                    <label for="logConversations">Log Conversations:</label>
+                    <select id="logConversations">
+                        <option value="false">No</option>
+                        <option value="true">Yes</option>
+                    </select>
+
+                    <label for="keepWindowActive">Keep Window Active (try if generation is slow or doesn't work):</label>
+                    <select id="keepWindowActive">
+                        <option value="false">No</option>
+                        <option value="true">Yes</option>
+                    </select>
+                </div>
+
+                <button type="button" id="saveButton">Save Settings</button>
+            </form>
+            
+            <div id="status"></div>
+            <div id="selectorStatus"></div>
+        </div>
     </div>
 </body>
 </html>
