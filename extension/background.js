@@ -1,11 +1,27 @@
 // background.js
+
+// Prompt Template String
+const PROMPT_TEMPLATE_STRING = `
+Generate a comprehensive summary of the YouTube video with the following details:
+
+Video Title: {{title}}
+Channel: {{channel}}
+View Count: {{views}}
+Likes: {{likes}}
+
+Video Description:
+{{description}}
+
+Full Video Transcript:
+{{transcript}}
+
+The summary should be well-structured, concise, and capture the key points and main topics discussed in the video. Use Markdown formatting for headings, lists, and emphasis where appropriate.
+`;
+
 // Default settings
 const DEFAULT_SETTINGS = {
-    backendUrl: 'http://localhost:5000',
     aiProvider: 'you',
-    transcriptionMethod: 'youtube',
-    processLocally: false,
-    logConversations: false,  // Default value set to false
+    transcriptionMethod: 'youtube_captions', // Updated default
     providers: {
         you: {
             url: 'https://you.com/?chatMode=custom',
@@ -62,9 +78,6 @@ chrome.runtime.onInstalled.addListener((details) => {
     }
 });
 
-// Timeout for fetch requests
-const TIMEOUT = 600000; // 10 minutes, for example
-
 // Keep the service worker alive
 chrome.alarms.create("keepAlive", { periodInMinutes: 0.5 });
 chrome.alarms.onAlarm.addListener((alarm) => {
@@ -87,7 +100,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             forwardMessageToYouTubeTabs(request);
             break;
         case 'closeTab':
-            closeNewTab(request.prompt, request.clipboard);
+            closeNewTab(); // No longer needs prompt/clipboard
             break;
         case 'seekToTimeEx':
             seekToTimeInYouTubeTab(request.time);
@@ -177,7 +190,7 @@ function forwardMessageToYouTubeTabs(message) {
 }
 
 // Replace the existing closeNewTab function with this improved version
-function closeNewTab(prompt, content) {
+function closeNewTab() { // Removed prompt, content parameters
     if (newTabId !== null) {
         chrome.tabs.remove(newTabId, () => {
             if (chrome.runtime.lastError) {
@@ -187,17 +200,6 @@ function closeNewTab(prompt, content) {
             newTabId = null;
         });
     }
-
-    // Handle logging if enabled
-    chrome.storage.sync.get(['backendUrl', 'logConversations'], function(items) {
-        if (items.logConversations && content) {
-            fetch(`${items.backendUrl}/save_result`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: prompt, result: content })
-            }).catch(error => console.error('Error saving result:', error));
-        }
-    });
 }
 
 // Replace the existing seekToTimeInYouTubeTab function
@@ -221,7 +223,7 @@ function handleSummaryGeneration() {
             const videoUrl = currentTab.url;
             if (videoUrl && videoUrl.startsWith("https://www.youtube.com")) {
                 console.log(videoUrl);
-                generateSummary(videoUrl);
+                generateSummary(videoUrl); // No await here, generateSummary is async
             } else {
                 sendMessageToContent({ action: 'updateSummaryStatus', status: 'Error: Not a valid YouTube video page' }, false, true);
             }
@@ -232,92 +234,229 @@ function handleSummaryGeneration() {
     });
 }
 
-// Generate summary
-function generateSummary(videoUrl) {
-    sendMessageToContent({ action: 'updateSummaryStatus', status: 'Generating transcript...' }, true, false);
+// Helper function to extract video ID
+function getVideoId(url) {
+    try {
+        const urlObj = new URL(url);
+        if (urlObj.hostname === 'www.youtube.com' || urlObj.hostname === 'youtube.com') {
+            return urlObj.searchParams.get('v');
+        } else if (urlObj.hostname === 'youtu.be') {
+            return urlObj.pathname.slice(1);
+        }
+    } catch (e) {
+        console.error("Error parsing URL:", e);
+    }
+    return null;
+}
 
-    chrome.storage.sync.get(['transcriptionMethod', 'processLocally'], function(items) {
-        const transcriptionMethod = items.transcriptionMethod;
-        const processLocally = items.processLocally;
+// Fetch YouTube Transcript
+async function fetchYouTubeTranscript(videoId, apiKey) {
+    console.log(`Starting to fetch transcript for videoId: ${videoId}`);
+    sendMessageToContent({ action: 'updateSummaryStatus', status: 'Fetching YouTube captions list...' }, true, false);
+
+    const listUrl = `https://www.googleapis.com/youtube/v3/captions?part=snippet&videoId=${videoId}&key=${apiKey}`;
+
+    try {
+        const listResponse = await fetch(listUrl);
+        if (!listResponse.ok) {
+            const errorText = await listResponse.text();
+            console.error('Error fetching caption list:', listResponse.status, errorText);
+            return { error: `Failed to list captions: ${listResponse.status}. ${errorText}` };
+        }
+        const listData = await listResponse.json();
+        console.log("Caption list data:", listData);
+
+        if (!listData.items || listData.items.length === 0) {
+            console.log('No caption tracks found.');
+            return { error: "No caption tracks found for this video." };
+        }
+
+        let chosenTrack = null;
+        const userLang = chrome.i18n.getUILanguage ? chrome.i18n.getUILanguage().split('-')[0] : 'en';
+
+        // Prioritize user's language
+        chosenTrack = listData.items.find(track => track.snippet.language === userLang);
+        // Then English
+        if (!chosenTrack) {
+            chosenTrack = listData.items.find(track => track.snippet.language === 'en');
+        }
+        // Then any other language
+        if (!chosenTrack) {
+            chosenTrack = listData.items[0];
+        }
+
+        if (!chosenTrack) {
+            // This case should ideally not be reached if listData.items is not empty
+            console.log('Could not select a suitable caption track.');
+            return { error: "No suitable caption track found after filtering." };
+        }
         
-        const controller = new AbortController();
-        const fetchPromise = createFetchPromise(videoUrl, controller, transcriptionMethod, processLocally);
-        const timeoutPromise = createTimeoutPromise(controller);
+        console.log(`Selected caption track: ${chosenTrack.id} (${chosenTrack.snippet.language})`);
+        sendMessageToContent({ action: 'updateSummaryStatus', status: `Found caption track (${chosenTrack.snippet.language}). Downloading...` }, true, false);
 
-        Promise.race([fetchPromise, timeoutPromise])
-            .then(response => {
-                if (!response.ok) throw new Error('Network response was not ok');
-                return response.json();
-            })
-            .then(data => {
-                console.log('Transcription completed successfully');
-                if (processLocally) {
-                    // If processing locally, send the response directly to the content script
-                    const summary = data.response.trim();
-                    const videoId = new URL(videoUrl).searchParams.get('v');
-                    const anchoredSummary = `[**Video Summary**](https://www.youtube.com/watch?v=${videoId})\n\n${summary}`;
-                    sendMessageToContent({ 
-                        action: 'updateSummaryContent', 
-                        content: anchoredSummary 
-                    }, false, false);
-                } else {
-                    // If not processing locally, open AI provider and paste prompt
-                    sendMessageToContent({ action: 'updateSummaryStatus', status: 'Opening AI provider to generate summary...' }, true, false);
-                    openAIProviderAndPastePrompt(data.prompt, videoUrl);
-                }
-            })
-            .catch(error => {
-                console.error('Error in fetch:', error);
-                handleFetchError(error);
-            });
+        const downloadUrl = `https://www.googleapis.com/youtube/v3/captions/${chosenTrack.id}?key=${apiKey}&tfmt=srv3`;
+        const transcriptResponse = await fetch(downloadUrl);
 
-        setupKeepAliveInterval(fetchPromise);
-    });
-}
+        if (!transcriptResponse.ok) {
+            const errorText = await transcriptResponse.text();
+            console.error('Error fetching transcript:', transcriptResponse.status, errorText);
+            return { error: `Failed to download caption track: ${transcriptResponse.status}. ${errorText}` };
+        }
 
-function createFetchPromise(videoUrl, controller, transcriptionMethod, processLocally) {
-    return new Promise((resolve, reject) => {
-        chrome.storage.sync.get(['backendUrl'], function(items) {
-            const backendUrl = items.backendUrl;
-            
-            let body = { 
-                url: videoUrl, 
-                transcriptionMethod: transcriptionMethod,
-                processLocally: processLocally
-            };
-            
-            if (transcriptionMethod.startsWith('whisper')) {
-                const [method, model] = transcriptionMethod.split(':');
-                body = { ...body, transcriptionMethod: method, whisperModel: model };
+        const transcriptText = await transcriptResponse.text();
+        console.log("Raw transcript (SRV3):", transcriptText.substring(0, 500)); // Log first 500 chars
+
+        // Simple SRV3 parser
+        let concatenatedText = "";
+        try {
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(transcriptText, "text/xml");
+            const textElements = xmlDoc.getElementsByTagName("text");
+            for (let i = 0; i < textElements.length; i++) {
+                concatenatedText += textElements[i].textContent + " ";
             }
+            concatenatedText = concatenatedText.trim().replace(/\s+/g, ' '); // Normalize spaces
+            console.log("Parsed transcript length:", concatenatedText.length);
+             if (concatenatedText.length === 0 && transcriptText.length > 0) {
+                console.warn("SRV3 parsing resulted in empty text, but raw transcript was not empty. There might be an issue with the SRV3 format or parser.");
+                // Fallback or more robust parsing might be needed here.
+                // For now, we'll return what we have, or an error if it's truly empty.
+                if (transcriptText.includes("<text")) { // Check if it looks like SRV3
+                     return { error: "Failed to parse SRV3 transcript text content." };
+                }
+            }
+        } catch (e) {
+            console.error("Error parsing SRV3 XML:", e);
+            return { error: "Error parsing SRV3 XML." };
+        }
+        
+        sendMessageToContent({ action: 'updateSummaryStatus', status: 'Transcript processed.' }, false, false);
+        return { transcript: concatenatedText };
 
-            fetch(`${backendUrl}/transcribe`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-                signal: controller.signal
-            }).then(resolve).catch(reject);
-        });
-    });
+    } catch (error) {
+        console.error('Error in fetchYouTubeTranscript:', error);
+        return { error: error.message || "An unknown error occurred while fetching transcript." };
+    }
 }
 
-function createTimeoutPromise(controller) {
-    return new Promise((_, reject) => {
-        setTimeout(() => {
-            controller.abort();
-            reject(new Error('Fetch request timed out'));
-        }, TIMEOUT);
-    });
+// Fetch YouTube Video Details
+async function fetchYouTubeVideoDetails(videoId, apiKey) {
+    console.log(`Starting to fetch video details for videoId: ${videoId}`);
+    const apiUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoId}&key=${apiKey}`;
+
+    try {
+        const response = await fetch(apiUrl);
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Error fetching video details:', response.status, errorText);
+            return { error: `Failed to fetch video details: ${response.status}. ${errorText}` };
+        }
+        const data = await response.json();
+        console.log("Video details data:", data);
+
+        if (data.items && data.items.length > 0) {
+            const item = data.items[0];
+            const details = {
+                title: item.snippet.title,
+                description: item.snippet.description,
+                channelTitle: item.snippet.channelTitle,
+                viewCount: item.statistics.viewCount,
+                likeCount: item.statistics.likeCount // Can be undefined if not available
+            };
+            console.log("Successfully fetched video details:", details);
+            return { details };
+        } else {
+            console.log('No video details found for this videoId.');
+            return { error: "No video details found for this video." };
+        }
+    } catch (error) {
+        console.error('Error in fetchYouTubeVideoDetails:', error);
+        return { error: error.message || "An unknown error occurred while fetching video details." };
+    }
 }
 
-function setupKeepAliveInterval(fetchPromise) {
-    const keepAliveInterval = setInterval(() => {
-        console.log('Keeping service worker alive');
-        chrome.runtime.sendMessage({ action: 'keepAlive' });
-    }, 25000);
+// Render Prompt Function
+function renderPrompt(templateString, data) {
+    let prompt = templateString;
+    for (const key in data) {
+        if (Object.prototype.hasOwnProperty.call(data, key)) {
+            prompt = prompt.replace(new RegExp('{{' + key + '}}', 'g'), data[key]);
+        }
+    }
+    return prompt;
+}
 
-    fetchPromise.finally(() => {
-        clearInterval(keepAliveInterval);
+// Generate summary
+async function generateSummary(videoUrl) {
+    sendMessageToContent({ action: 'updateSummaryStatus', status: 'Starting summary generation...' }, true, false);
+
+    chrome.storage.sync.get(['youtubeApiKey', 'transcriptionMethod', 'processLocally', 'aiProvider', 'providers', 'keepWindowActive'], async function(items) {
+        const { youtubeApiKey, transcriptionMethod, processLocally, aiProvider, providers, keepWindowActive } = items;
+
+        if (!youtubeApiKey) {
+            sendMessageToContent({ action: 'updateSummaryStatus', status: 'Error: YouTube Data API Key not set. Please set it in the extension options.' }, false, true);
+            return;
+        }
+
+        const videoId = getVideoId(videoUrl);
+        if (!videoId) {
+            sendMessageToContent({ action: 'updateSummaryStatus', status: 'Error: Could not extract video ID from URL.' }, false, true);
+            return;
+        }
+        
+        let transcript = "";
+
+        if (transcriptionMethod === 'youtube_captions') {
+            sendMessageToContent({ action: 'updateSummaryStatus', status: 'Fetching YouTube captions...' }, true, false);
+            const transcriptResponse = await fetchYouTubeTranscript(videoId, youtubeApiKey);
+
+            if (transcriptResponse.error) {
+                sendMessageToContent({ action: 'updateSummaryStatus', status: `Error fetching transcript: ${transcriptResponse.error}` }, false, true);
+                return;
+            }
+            transcript = transcriptResponse.transcript;
+            // sendMessageToContent({ action: 'updateSummaryStatus', status: `Transcript fetched. Length: ${transcript.length}. Preparing prompt...` }, true, false);
+        } else {
+            // This part can be used for other transcription methods in the future
+            sendMessageToContent({ action: 'updateSummaryStatus', status: `Error: Transcription method "${transcriptionMethod}" is not supported for client-side processing.` }, false, true);
+            return;
+        }
+
+        if (!transcript || transcript.trim().length === 0) {
+             sendMessageToContent({ action: 'updateSummaryStatus', status: 'Error: Transcript is empty, cannot generate summary.' }, false, true);
+             return;
+        }
+
+        // Fetch video details
+        sendMessageToContent({ action: 'updateSummaryStatus', status: 'Fetching video details...' }, true, false);
+        const videoDetailsResponse = await fetchYouTubeVideoDetails(videoId, youtubeApiKey);
+
+        if (videoDetailsResponse.error) {
+            sendMessageToContent({ action: 'updateSummaryStatus', status: `Error fetching video details: ${videoDetailsResponse.error}` }, false, true);
+            return;
+        }
+        const videoDetails = videoDetailsResponse.details;
+        console.log("Fetched video details:", videoDetails);
+        sendMessageToContent({ action: 'updateSummaryStatus', status: 'Video details fetched. Preparing prompt...' }, true, false);
+
+        // Prepare data for prompt template
+        const promptData = {
+            title: videoDetails.title,
+            channel: videoDetails.channelTitle,
+            views: videoDetails.viewCount,
+            likes: videoDetails.likeCount || 'N/A',
+            description: videoDetails.description,
+            transcript: transcript
+        };
+        
+        // Render the prompt
+        const promptForAI = renderPrompt(PROMPT_TEMPLATE_STRING, promptData);
+        
+        console.log("Prepared prompt for AI:", promptForAI.substring(0, 300) + "..."); // Log beginning of prompt
+
+        // Always open the AI provider with the constructed prompt
+        sendMessageToContent({ action: 'updateSummaryStatus', status: 'Opening AI provider to generate summary...' }, true, false);
+        openAIProviderAndPastePrompt(promptForAI, videoUrl);
     });
 }
 
@@ -407,16 +546,6 @@ function openAIProviderAndPastePrompt(prompt, videoUrl) {
             });
         });
     });
-}
-
-// Handle fetch error
-function handleFetchError(error) {
-    console.error('Error in fetch:', error);
-    if (error.name === 'AbortError' || error.message === 'Fetch request timed out') {
-        sendMessageToContent({ action: 'updateSummaryStatus', status: 'Error: Transcribe request timed out' }, false, true);
-    } else {
-        sendMessageToContent({ action: 'updateSummaryStatus', status: 'Error: Transcribe API call failed' }, false, true);
-    }
 }
 
 // Send message to content script
@@ -568,16 +697,9 @@ function startWindowCloseMonitoring(tabId, provider) {
             });
         }
 
-        // Close the tab
-        if (newTabId !== null) {
-            chrome.tabs.remove(newTabId, () => {
-                if (chrome.runtime.lastError) {
-                    console.error('Error closing tab:', chrome.runtime.lastError);
-                    setTimeout(() => chrome.tabs.remove(newTabId), 500);
-                }
-                newTabId = null;
-            });
-        }
+        // Send message to self to close the tab via the message listener
+        // This ensures consistent handling through closeNewTab()
+        chrome.runtime.sendMessage({ action: 'closeTab' });
     }
 }
 

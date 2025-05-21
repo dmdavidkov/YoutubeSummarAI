@@ -223,9 +223,9 @@
             
             <form id="optionsForm">
                 <div class="section">
-                    <div class="section-title">Connection Settings</div>
-                    <label for="backendUrl">Backend URL:</label>
-                    <input type="text" id="backendUrl" name="backendUrl" placeholder="Enter backend URL">
+                    <div class="section-title">API Keys</div>
+                    <label for="youtubeApiKey">YouTube Data API Key:</label>
+                    <input type="text" id="youtubeApiKey" name="youtubeApiKey" placeholder="Enter your YouTube Data API Key">
                 </div>
 
                 <div class="section">
@@ -244,37 +244,12 @@
                     <div class="section-title">Transcription Settings</div>
                     <label for="transcriptionMethod">Transcription Method:</label>
                     <select id="transcriptionMethod">
-                        <option value="youtube">YouTube API</option>
-                        <optgroup label="Whisper Models">
-                            <option value="whisper:base">Base</option>
-                            <option value="whisper:base.en">Base English</option>
-                            <option value="whisper:tiny">Tiny</option>
-                            <option value="whisper:tiny.en">Tiny English</option>
-                            <option value="whisper:small">Small</option>
-                            <option value="whisper:small.en">Small English</option>
-                            <option value="whisper:medium">Medium</option>
-                            <option value="whisper:medium.en">Medium English</option>
-                            <option value="whisper:large">Large</option>
-                            <option value="whisper:large-v3">Large v3</option>
-                            <option value="whisper:deepdml/faster-whisper-large-v3-turbo-ct2">Turbo</option>
-                        </optgroup>
+                        <option value="youtube_captions">YouTube API/Captions</option>
                     </select>
                 </div>
 
                 <div class="section">
                     <div class="section-title">Additional Options</div>
-                    <label for="processLocally">Process Locally:</label>
-                    <select id="processLocally">
-                        <option value="false">No</option>
-                        <option value="true">Yes</option>
-                    </select>
-
-                    <label for="logConversations">Log Conversations:</label>
-                    <select id="logConversations">
-                        <option value="false">No</option>
-                        <option value="true">Yes</option>
-                    </select>
-
                     <label for="keepWindowActive">Keep Window Active (try if generation is slow or doesn't work):</label>
                     <select id="keepWindowActive">
                         <option value="false">No</option>

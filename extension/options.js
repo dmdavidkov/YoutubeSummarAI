@@ -6,11 +6,9 @@ chrome.storage.sync.get(null, (items) => {
     console.log("Retrieved settings from storage:", items);
     // Use the settings from storage
     settings = {
-        backendUrl: items.backendUrl || '',
+        youtubeApiKey: items.youtubeApiKey || '',
         aiProvider: items.aiProvider || '',
-        transcriptionMethod: items.transcriptionMethod || '',
-        processLocally: items.processLocally || false,
-        logConversations: items.logConversations || false,
+        transcriptionMethod: items.transcriptionMethod || 'youtube_captions',
         keepWindowActive: items.keepWindowActive || false,
         providers: items.providers || {}
     };
@@ -23,33 +21,23 @@ chrome.storage.sync.get(null, (items) => {
 
 function initializeOptions() {
     console.log("Initializing options");
-    const backendUrlInput = document.getElementById('backendUrl');
+    const youtubeApiKeyInput = document.getElementById('youtubeApiKey');
     const aiProviderSelect = document.getElementById('aiProvider');
     const transcriptionMethodSelect = document.getElementById('transcriptionMethod');
-    const processLocallySelect = document.getElementById('processLocally');
-    const logConversationsSelect = document.getElementById('logConversations');
     const keepWindowActiveSelect = document.getElementById('keepWindowActive');
 
     // Check if elements exist before setting values
-    if (backendUrlInput) {
-        backendUrlInput.value = settings.backendUrl || '';
-        console.log("Set backendUrl:", backendUrlInput.value);
+    if (youtubeApiKeyInput) {
+        youtubeApiKeyInput.value = settings.youtubeApiKey || '';
+        console.log("Set youtubeApiKey:", youtubeApiKeyInput.value);
     }
     if (aiProviderSelect) {
         aiProviderSelect.value = settings.aiProvider || '';
         console.log("Set aiProvider:", aiProviderSelect.value);
     }
     if (transcriptionMethodSelect) {
-        transcriptionMethodSelect.value = settings.transcriptionMethod || '';
+        transcriptionMethodSelect.value = settings.transcriptionMethod || 'youtube_captions';
         console.log("Set transcriptionMethod:", transcriptionMethodSelect.value);
-    }
-    if (processLocallySelect) {
-        processLocallySelect.value = settings.processLocally.toString();
-        console.log("Set processLocally:", processLocallySelect.value);
-    }
-    if (logConversationsSelect) {
-        logConversationsSelect.value = settings.logConversations.toString();
-        console.log("Set logConversations:", logConversationsSelect.value);
     }
     if (keepWindowActiveSelect) {
         keepWindowActiveSelect.value = settings.keepWindowActive.toString();
@@ -63,11 +51,9 @@ function initializeOptions() {
     const saveButton = document.getElementById('saveButton');
     if (saveButton) saveButton.addEventListener('click', saveOptions);
     if (aiProviderSelect) aiProviderSelect.addEventListener('change', handleProviderChange);
-    if (processLocallySelect) processLocallySelect.addEventListener('change', handleProcessLocallyChange);
 
     // Initial toggle of provider fields
     handleProviderChange();
-    handleProcessLocallyChange();
 }
 
 function generateProviderSettings() {
@@ -134,32 +120,6 @@ function showProviderSettings(provider) {
     }
 }
 
-function handleProcessLocallyChange() {
-    const processLocally = document.getElementById('processLocally').value === 'true';
-    const aiConfigSection = document.querySelector('.section:nth-child(2)'); // AI Configuration section
-    const aiProviderSelect = document.getElementById('aiProvider');
-    const aiProviderSection = document.getElementById('aiProviderSection');
-
-    // Disable or enable the entire AI Configuration section
-    if (aiConfigSection) {
-        if (processLocally) {
-            aiConfigSection.style.opacity = '0.5';
-            aiConfigSection.style.pointerEvents = 'none';
-            aiProviderSelect.disabled = true;
-            showStatus('Local processing enabled - AI provider settings disabled', 'success', 2000);
-        } else {
-            aiConfigSection.style.opacity = '1';
-            aiConfigSection.style.pointerEvents = 'auto';
-            aiProviderSelect.disabled = false;
-        }
-    }
-
-    // Hide or show the provider settings
-    if (aiProviderSection) {
-        aiProviderSection.style.display = processLocally ? 'none' : 'block';
-    }
-}
-
 function restoreOptions() {
     console.log("Restoring options");
     showStatus('Loading settings...', 'loading', 0);
@@ -192,7 +152,7 @@ function restoreOptions() {
         }
 
         // Set values for other fields
-        const fields = ['backendUrl', 'processLocally', 'logConversations'];
+        const fields = ['youtubeApiKey']; // Removed 'processLocally' and 'logConversations'
         fields.forEach(field => {
             const element = document.getElementById(field);
             if (element) {
@@ -208,7 +168,7 @@ function restoreOptions() {
         // Handle transcriptionMethod separately
         const transcriptionMethodElement = document.getElementById('transcriptionMethod');
         if (transcriptionMethodElement) {
-            transcriptionMethodElement.value = items.transcriptionMethod || '';
+            transcriptionMethodElement.value = items.transcriptionMethod || 'youtube_captions';
             console.log(`Restored transcriptionMethod:`, transcriptionMethodElement.value);
         }
 
@@ -255,9 +215,7 @@ function saveOptions() {
     const newSettings = {
         aiProvider: document.getElementById('aiProvider')?.value,
         transcriptionMethod: document.getElementById('transcriptionMethod')?.value,
-        processLocally: document.getElementById('processLocally')?.value === 'true',
-        logConversations: document.getElementById('logConversations')?.value === 'true',
-        backendUrl: document.getElementById('backendUrl')?.value,
+        youtubeApiKey: document.getElementById('youtubeApiKey')?.value,
         keepWindowActive: document.getElementById('keepWindowActive')?.value === 'true',
         providers: {}
     };
