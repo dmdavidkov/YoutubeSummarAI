@@ -43,5 +43,8 @@
       "matches": ["<all_urls>"]
     }
   ],
-  "options_page": "options.html"
+  "options_page": "options.html",
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' https://cdn.jsdelivr.net; object-src 'self'"
+  }
 }

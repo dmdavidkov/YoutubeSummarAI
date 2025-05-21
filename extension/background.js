@@ -249,98 +249,71 @@ function getVideoId(url) {
     return null;
 }
 
-// Fetch YouTube Transcript
-async function fetchYouTubeTranscript(videoId, apiKey) {
-    console.log(`Starting to fetch transcript for videoId: ${videoId}`);
-    sendMessageToContent({ action: 'updateSummaryStatus', status: 'Fetching YouTube captions list...' }, true, false);
+// Variable to hold the youtube-transcript library module
+let YouTubeTranscriptModule;
 
-    const listUrl = `https://www.googleapis.com/youtube/v3/captions?part=snippet&videoId=${videoId}&key=${apiKey}`;
+// Initialize the youtube-transcript library
+async function initializeTranscriptLibrary() {
+    if (!YouTubeTranscriptModule) {
+        try {
+            // Using a version known to have an ESM build.
+            YouTubeTranscriptModule = await import('https://cdn.jsdelivr.net/npm/youtube-transcript@1.0.6/dist/youtube-transcript.esm.js');
+            console.log("youtube-transcript library loaded successfully.");
+        } catch (e) {
+            console.error("Failed to load youtube-transcript library:", e);
+            // Notify the user or disable functionality if it fails
+            sendMessageToContent({ 
+                action: 'updateSummaryStatus', 
+                status: 'Error: Failed to load transcription library. Please try reloading the extension.', 
+                isError: true 
+            });
+        }
+    }
+}
+
+// Call initializeTranscriptLibrary when the service worker starts
+initializeTranscriptLibrary();
+
+// Fetch YouTube Transcript using the youtube-transcript library
+async function fetchYouTubeTranscript(videoId) { // apiKey parameter removed
+    sendMessageToContent({ action: 'updateSummaryStatus', status: 'Fetching transcript using external library...' }, true, false);
+
+    if (!YouTubeTranscriptModule || !YouTubeTranscriptModule.YouTubeTranscript) {
+        console.error("youtube-transcript library not available.");
+        // Attempt to re-initialize if it failed earlier or wasn't ready
+        await initializeTranscriptLibrary(); 
+        if (!YouTubeTranscriptModule || !YouTubeTranscriptModule.YouTubeTranscript) {
+            return { error: "Transcription library not loaded." };
+        }
+    }
+    const fetchTranscriptFunction = YouTubeTranscriptModule.YouTubeTranscript.fetchTranscript;
 
     try {
-        const listResponse = await fetch(listUrl);
-        if (!listResponse.ok) {
-            const errorText = await listResponse.text();
-            console.error('Error fetching caption list:', listResponse.status, errorText);
-            return { error: `Failed to list captions: ${listResponse.status}. ${errorText}` };
+        const transcriptParts = await fetchTranscriptFunction(videoId);
+        if (!transcriptParts || transcriptParts.length === 0) {
+            sendMessageToContent({ action: 'updateSummaryStatus', status: "No transcript found or video is invalid/private.", isError: true }, false, true);
+            return { error: "No transcript found or video is invalid/private (youtube-transcript)." };
         }
-        const listData = await listResponse.json();
-        console.log("Caption list data:", listData);
-
-        if (!listData.items || listData.items.length === 0) {
-            console.log('No caption tracks found.');
-            return { error: "No caption tracks found for this video." };
-        }
-
-        let chosenTrack = null;
-        const userLang = chrome.i18n.getUILanguage ? chrome.i18n.getUILanguage().split('-')[0] : 'en';
-
-        // Prioritize user's language
-        chosenTrack = listData.items.find(track => track.snippet.language === userLang);
-        // Then English
-        if (!chosenTrack) {
-            chosenTrack = listData.items.find(track => track.snippet.language === 'en');
-        }
-        // Then any other language
-        if (!chosenTrack) {
-            chosenTrack = listData.items[0];
-        }
-
-        if (!chosenTrack) {
-            // This case should ideally not be reached if listData.items is not empty
-            console.log('Could not select a suitable caption track.');
-            return { error: "No suitable caption track found after filtering." };
-        }
-        
-        console.log(`Selected caption track: ${chosenTrack.id} (${chosenTrack.snippet.language})`);
-        sendMessageToContent({ action: 'updateSummaryStatus', status: `Found caption track (${chosenTrack.snippet.language}). Downloading...` }, true, false);
-
-        const downloadUrl = `https://www.googleapis.com/youtube/v3/captions/${chosenTrack.id}?key=${apiKey}&tfmt=srv3`;
-        const transcriptResponse = await fetch(downloadUrl);
-
-        if (!transcriptResponse.ok) {
-            const errorText = await transcriptResponse.text();
-            console.error('Error fetching transcript:', transcriptResponse.status, errorText);
-            return { error: `Failed to download caption track: ${transcriptResponse.status}. ${errorText}` };
-        }
-
-        const transcriptText = await transcriptResponse.text();
-        console.log("Raw transcript (SRV3):", transcriptText.substring(0, 500)); // Log first 500 chars
-
-        // Simple SRV3 parser
-        let concatenatedText = "";
-        try {
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(transcriptText, "text/xml");
-            const textElements = xmlDoc.getElementsByTagName("text");
-            for (let i = 0; i < textElements.length; i++) {
-                concatenatedText += textElements[i].textContent + " ";
-            }
-            concatenatedText = concatenatedText.trim().replace(/\s+/g, ' '); // Normalize spaces
-            console.log("Parsed transcript length:", concatenatedText.length);
-             if (concatenatedText.length === 0 && transcriptText.length > 0) {
-                console.warn("SRV3 parsing resulted in empty text, but raw transcript was not empty. There might be an issue with the SRV3 format or parser.");
-                // Fallback or more robust parsing might be needed here.
-                // For now, we'll return what we have, or an error if it's truly empty.
-                if (transcriptText.includes("<text")) { // Check if it looks like SRV3
-                     return { error: "Failed to parse SRV3 transcript text content." };
-                }
-            }
-        } catch (e) {
-            console.error("Error parsing SRV3 XML:", e);
-            return { error: "Error parsing SRV3 XML." };
-        }
-        
-        sendMessageToContent({ action: 'updateSummaryStatus', status: 'Transcript processed.' }, false, false);
-        return { transcript: concatenatedText };
-
+        const transcriptText = transcriptParts.map(part => part.text).join(' ');
+        sendMessageToContent({ action: 'updateSummaryStatus', status: 'Transcript fetched successfully.' }, false, false);
+        return { transcript: transcriptText };
     } catch (error) {
-        console.error('Error in fetchYouTubeTranscript:', error);
-        return { error: error.message || "An unknown error occurred while fetching transcript." };
+        console.error("Error fetching transcript with youtube-transcript:", error);
+        let errorMessage = "Failed to fetch transcript.";
+        if (error.message && error.message.toLowerCase().includes("subtitles not found")) {
+            errorMessage = "No subtitles found for this video.";
+        } else if (error.message && error.message.toLowerCase().includes("disabled subtitles")) {
+            errorMessage = "Subtitles are disabled for this video.";
+        } else if (error.message) {
+            errorMessage = `Error: ${error.message.substring(0,100)}`; // Keep it short
+        }
+        sendMessageToContent({ action: 'updateSummaryStatus', status: errorMessage }, false, true);
+        return { error: errorMessage };
     }
 }
 
 // Fetch YouTube Video Details
-async function fetchYouTubeVideoDetails(videoId, apiKey) {
+async function fetchYouTubeVideoDetails(videoId, apiKey) { // apiKey is still needed here
     console.log(`Starting to fetch video details for videoId: ${videoId}`);
     const apiUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoId}&key=${apiKey}`;
 
@@ -390,13 +363,11 @@ function renderPrompt(templateString, data) {
 async function generateSummary(videoUrl) {
     sendMessageToContent({ action: 'updateSummaryStatus', status: 'Starting summary generation...' }, true, false);
 
-    chrome.storage.sync.get(['youtubeApiKey', 'transcriptionMethod', 'processLocally', 'aiProvider', 'providers', 'keepWindowActive'], async function(items) {
-        const { youtubeApiKey, transcriptionMethod, processLocally, aiProvider, providers, keepWindowActive } = items;
+    chrome.storage.sync.get(['transcriptionMethod', 'aiProvider', 'providers', 'keepWindowActive'], async function(storageItems) {
+        const { transcriptionMethod, aiProvider, providers, keepWindowActive } = storageItems;
 
-        if (!youtubeApiKey) {
-            sendMessageToContent({ action: 'updateSummaryStatus', status: 'Error: YouTube Data API Key not set. Please set it in the extension options.' }, false, true);
-            return;
-        }
+        // Note: youtubeApiKey is fetched later, conditionally
+        // Note: processLocally was removed in a previous step
 
         const videoId = getVideoId(videoUrl);
         if (!videoId) {
@@ -407,11 +378,12 @@ async function generateSummary(videoUrl) {
         let transcript = "";
 
         if (transcriptionMethod === 'youtube_captions') {
-            sendMessageToContent({ action: 'updateSummaryStatus', status: 'Fetching YouTube captions...' }, true, false);
-            const transcriptResponse = await fetchYouTubeTranscript(videoId, youtubeApiKey);
+            // sendMessageToContent({ action: 'updateSummaryStatus', status: 'Fetching YouTube captions...' }, true, false); // Message is now inside fetchYouTubeTranscript
+            const transcriptResponse = await fetchYouTubeTranscript(videoId); // youtubeApiKey removed
 
             if (transcriptResponse.error) {
-                sendMessageToContent({ action: 'updateSummaryStatus', status: `Error fetching transcript: ${transcriptResponse.error}` }, false, true);
+                // Error message is already sent from fetchYouTubeTranscript
+                // sendMessageToContent({ action: 'updateSummaryStatus', status: `Error fetching transcript: ${transcriptResponse.error}` }, false, true);
                 return;
             }
             transcript = transcriptResponse.transcript;
@@ -427,23 +399,35 @@ async function generateSummary(videoUrl) {
              return;
         }
 
-        // Fetch video details
-        sendMessageToContent({ action: 'updateSummaryStatus', status: 'Fetching video details...' }, true, false);
-        const videoDetailsResponse = await fetchYouTubeVideoDetails(videoId, youtubeApiKey);
+        // Conditionally Fetch Video Details
+        let videoDetails = { title: 'N/A', channelTitle: 'N/A', viewCount: 'N/A', likeCount: 'N/A', description: 'N/A' }; // Default structure
+        const apiKeyItems = await new Promise(resolve => chrome.storage.sync.get(['youtubeApiKey'], resolve));
+        const youtubeApiKey = apiKeyItems.youtubeApiKey;
 
-        if (videoDetailsResponse.error) {
-            sendMessageToContent({ action: 'updateSummaryStatus', status: `Error fetching video details: ${videoDetailsResponse.error}` }, false, true);
-            return;
+        if (youtubeApiKey) {
+            sendMessageToContent({ action: 'updateSummaryStatus', status: 'API key found. Fetching video details...' }, true, false);
+            const videoDetailsResponse = await fetchYouTubeVideoDetails(videoId, youtubeApiKey);
+            if (videoDetailsResponse.details) {
+                videoDetails = videoDetailsResponse.details;
+                sendMessageToContent({ action: 'updateSummaryStatus', status: 'Video details fetched.' }, false, false);
+            } else {
+                // Log the error but don't stop the process. Proceed with transcript-only.
+                console.warn('Failed to fetch video details with provided API key:', videoDetailsResponse.error);
+                sendMessageToContent({ action: 'updateSummaryStatus', status: 'Could not fetch video details. Proceeding with transcript only.' }, false, true);
+                // videoDetails remains the default structure
+            }
+        } else {
+            sendMessageToContent({ action: 'updateSummaryStatus', status: 'No API key found. Proceeding with transcript only.' }, false, false);
+            // videoDetails remains the default structure
         }
-        const videoDetails = videoDetailsResponse.details;
-        console.log("Fetched video details:", videoDetails);
-        sendMessageToContent({ action: 'updateSummaryStatus', status: 'Video details fetched. Preparing prompt...' }, true, false);
+        
+        sendMessageToContent({ action: 'updateSummaryStatus', status: 'Preparing prompt...' }, true, false);
 
         // Prepare data for prompt template
         const promptData = {
             title: videoDetails.title,
-            channel: videoDetails.channelTitle,
-            views: videoDetails.viewCount,
+            channel: videoDetails.channelTitle, // Corrected from channel
+            views: videoDetails.viewCount,      // Corrected from viewCount
             likes: videoDetails.likeCount || 'N/A',
             description: videoDetails.description,
             transcript: transcript
