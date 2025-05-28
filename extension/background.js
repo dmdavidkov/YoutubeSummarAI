@@ -1,3 +1,5 @@
+import { YouTubeTranscript } from './lib/youtube-transcript.esm.js';
+
 // background.js
 
 // Prompt Template String
@@ -249,47 +251,12 @@ function getVideoId(url) {
     return null;
 }
 
-// Variable to hold the youtube-transcript library module
-let YouTubeTranscriptModule;
-
-// Initialize the youtube-transcript library
-async function initializeTranscriptLibrary() {
-    if (!YouTubeTranscriptModule) {
-        try {
-            // Using a version known to have an ESM build.
-            YouTubeTranscriptModule = await import('https://cdn.jsdelivr.net/npm/youtube-transcript@1.0.6/dist/youtube-transcript.esm.js');
-            console.log("youtube-transcript library loaded successfully.");
-        } catch (e) {
-            console.error("Failed to load youtube-transcript library:", e);
-            // Notify the user or disable functionality if it fails
-            sendMessageToContent({ 
-                action: 'updateSummaryStatus', 
-                status: 'Error: Failed to load transcription library. Please try reloading the extension.', 
-                isError: true 
-            });
-        }
-    }
-}
-
-// Call initializeTranscriptLibrary when the service worker starts
-initializeTranscriptLibrary();
-
-// Fetch YouTube Transcript using the youtube-transcript library
-async function fetchYouTubeTranscript(videoId) { // apiKey parameter removed
-    sendMessageToContent({ action: 'updateSummaryStatus', status: 'Fetching transcript using external library...' }, true, false);
-
-    if (!YouTubeTranscriptModule || !YouTubeTranscriptModule.YouTubeTranscript) {
-        console.error("youtube-transcript library not available.");
-        // Attempt to re-initialize if it failed earlier or wasn't ready
-        await initializeTranscriptLibrary(); 
-        if (!YouTubeTranscriptModule || !YouTubeTranscriptModule.YouTubeTranscript) {
-            return { error: "Transcription library not loaded." };
-        }
-    }
-    const fetchTranscriptFunction = YouTubeTranscriptModule.YouTubeTranscript.fetchTranscript;
+// Fetch YouTube Transcript using the locally imported youtube-transcript library
+async function fetchYouTubeTranscript(videoId) { 
+    sendMessageToContent({ action: 'updateSummaryStatus', status: 'Fetching transcript using local library...' }, true, false);
 
     try {
-        const transcriptParts = await fetchTranscriptFunction(videoId);
+        const transcriptParts = await YouTubeTranscript.fetchTranscript(videoId);
         if (!transcriptParts || transcriptParts.length === 0) {
             sendMessageToContent({ action: 'updateSummaryStatus', status: "No transcript found or video is invalid/private.", isError: true }, false, true);
             return { error: "No transcript found or video is invalid/private (youtube-transcript)." };
