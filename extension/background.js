@@ -339,7 +339,15 @@ async function generateSummary(videoUrl) {
     sendMessageToContent({ action: 'updateSummaryStatus', status: 'Starting summary generation...' }, true, false);
 
     chrome.storage.sync.get(['transcriptionMethod', 'aiProvider', 'providers', 'keepWindowActive'], async function(storageItems) {
-        const { transcriptionMethod, aiProvider, providers, keepWindowActive } = storageItems;
+        let transcriptionMethod = storageItems.transcriptionMethod; // Store in a mutable variable
+
+        // Check if transcriptionMethod is undefined (primitive) or the literal string "undefined"
+        if (typeof transcriptionMethod === 'undefined' || transcriptionMethod === "undefined") {
+            console.warn(`Transcription method was '${storageItems.transcriptionMethod}' in storage, defaulting to 'youtube_captions'.`);
+            transcriptionMethod = 'youtube_captions'; // Default to the only supported method
+        }
+        
+        const { aiProvider, providers, keepWindowActive } = storageItems;
 
         // Note: youtubeApiKey is fetched later, conditionally
         // Note: processLocally was removed in a previous step
@@ -352,9 +360,16 @@ async function generateSummary(videoUrl) {
         
         let transcript = "";
 
-        if (transcriptionMethod === 'youtube_captions') {
-            // sendMessageToContent({ action: 'updateSummaryStatus', status: 'Fetching YouTube captions...' }, true, false); // Message is now inside fetchYouTubeTranscript
-            const transcriptResponse = await fetchYouTubeTranscript(videoId); // youtubeApiKey removed
+        // This check should use the potentially corrected 'transcriptionMethod' variable
+        if (transcriptionMethod !== 'youtube_captions') {
+            sendMessageToContent({ action: 'updateSummaryStatus', status: `Error: Transcription method "${transcriptionMethod}" is not supported for client-side processing.` }, false, true);
+            console.error(`Unsupported transcriptionMethod found: ${transcriptionMethod}`);
+            return; 
+        }
+
+        // Now we are sure transcriptionMethod is 'youtube_captions'
+        // sendMessageToContent({ action: 'updateSummaryStatus', status: 'Fetching YouTube captions...' }, true, false); // Message is now inside fetchYouTubeTranscript
+        const transcriptResponse = await fetchYouTubeTranscript(videoId); // youtubeApiKey removed
 
             if (transcriptResponse.error) {
                 // Error message is already sent from fetchYouTubeTranscript
@@ -363,11 +378,8 @@ async function generateSummary(videoUrl) {
             }
             transcript = transcriptResponse.transcript;
             // sendMessageToContent({ action: 'updateSummaryStatus', status: `Transcript fetched. Length: ${transcript.length}. Preparing prompt...` }, true, false);
-        } else {
-            // This part can be used for other transcription methods in the future
-            sendMessageToContent({ action: 'updateSummaryStatus', status: `Error: Transcription method "${transcriptionMethod}" is not supported for client-side processing.` }, false, true);
-            return;
-        }
+        
+        // The else block for unsupported transcriptionMethod is now handled above.
 
         if (!transcript || transcript.trim().length === 0) {
              sendMessageToContent({ action: 'updateSummaryStatus', status: 'Error: Transcript is empty, cannot generate summary.' }, false, true);
