@@ -1,4 +1,4 @@
-import { YouTubeTranscript } from './lib/youtube-transcript.esm.js';
+import { YoutubeTranscript } from './lib/youtube-transcript.esm.js';
 
 // background.js
 
@@ -256,7 +256,7 @@ async function fetchYouTubeTranscript(videoId) {
     sendMessageToContent({ action: 'updateSummaryStatus', status: 'Fetching transcript using local library...' }, true, false);
 
     try {
-        const transcriptParts = await YouTubeTranscript.fetchTranscript(videoId);
+        const transcriptParts = await YoutubeTranscript.fetchTranscript(videoId);
         if (!transcriptParts || transcriptParts.length === 0) {
             sendMessageToContent({ action: 'updateSummaryStatus', status: "No transcript found or video is invalid/private.", isError: true }, false, true);
             return { error: "No transcript found or video is invalid/private (youtube-transcript)." };
