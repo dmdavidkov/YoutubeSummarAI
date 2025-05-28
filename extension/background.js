@@ -281,37 +281,45 @@ async function fetchYouTubeTranscript(videoId) {
 
 // Fetch YouTube Video Details
 async function fetchYouTubeVideoDetails(videoId, apiKey) { // apiKey is still needed here
-    console.log(`Starting to fetch video details for videoId: ${videoId}`);
     const apiUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoId}&key=${apiKey}`;
+    console.log(`Fetching video details from: ${apiUrl}`);
 
     try {
         const response = await fetch(apiUrl);
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Error fetching video details:', response.status, errorText);
-            return { error: `Failed to fetch video details: ${response.status}. ${errorText}` };
+            // Try to get error message from API response if possible
+            let apiErrorMsg = `HTTP error ${response.status}`;
+            try {
+                const errorData = await response.json();
+                apiErrorMsg += `: ${errorData.error.message || 'Unknown API error'}`;
+            } catch (e) { /* Ignore if error response is not JSON */ }
+            console.error(`Error fetching video details: ${apiErrorMsg}`);
+            return { error: apiErrorMsg };
         }
         const data = await response.json();
-        console.log("Video details data:", data);
-
         if (data.items && data.items.length > 0) {
-            const item = data.items[0];
+            const snippet = data.items[0].snippet;
+            const statistics = data.items[0].statistics;
             const details = {
-                title: item.snippet.title,
-                description: item.snippet.description,
-                channelTitle: item.snippet.channelTitle,
-                viewCount: item.statistics.viewCount,
-                likeCount: item.statistics.likeCount // Can be undefined if not available
+                title: snippet.title,
+                description: snippet.description,
+                channelTitle: snippet.channelTitle,
+                viewCount: statistics.viewCount,
+                likeCount: statistics.likeCount // This can be undefined, handled by consumer
             };
             console.log("Successfully fetched video details:", details);
             return { details };
         } else {
-            console.log('No video details found for this videoId.');
-            return { error: "No video details found for this video." };
+            console.log('No video items found for the given ID.');
+            return { error: 'Video not found or no details available.' };
         }
     } catch (error) {
-        console.error('Error in fetchYouTubeVideoDetails:', error);
-        return { error: error.message || "An unknown error occurred while fetching video details." };
+        console.error('Network or unexpected error fetching video details:', error);
+        // Differentiate TypeError for specific feedback
+        if (error instanceof TypeError && error.message === "Failed to fetch") {
+             return { error: "Network error (Failed to fetch). Check connectivity or host permissions." };
+        }
+        return { error: `Unexpected error fetching details: ${error.message}`.substring(0,150) }; // Keep error concise
     }
 }
 
