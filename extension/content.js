@@ -92,10 +92,16 @@
                         console.error('Failed to copy content:', err);
                     }
                     document.body.removeChild(textArea);
-                    break;
-
-                case 'extractTranscript':
+                    break;                case 'extractTranscript':
                     extractYouTubeTranscript().then(result => {
+                        sendResponse(result);
+                    }).catch(error => {
+                        sendResponse({ error: error.message });
+                    });
+                    return true; // Indicate async response
+
+                case 'extractVideoDetails':
+                    extractYouTubeVideoDetails().then(result => {
                         sendResponse(result);
                     }).catch(error => {
                         sendResponse({ error: error.message });
@@ -735,17 +741,266 @@
                         if (!transcriptText || transcriptText.trim().length === 0) {
                             reject(new Error('No transcript text could be extracted.'));
                             return;
-                        }
-
-                        resolve({ transcript: transcriptText });
+                        }                        resolve({ transcript: transcriptText });
                     } catch (error) {
                         reject(new Error(`Error extracting transcript text: ${error.message}`));
                     }
                 }, 2000); // Wait 2 seconds for transcript to load
 
             } catch (error) {
-                reject(new Error(`Error accessing transcript: ${error.message}`));
+                reject(new Error(`Error accessing transcript: ${error.message}`));            }
+        });    }
+
+    // Enhanced description extraction function
+    async function extractEnhancedDescription(details) {
+        try {
+            let descriptionText = '';
+            
+            console.log('Starting enhanced description extraction...');
+            
+            // Step 1: Try to find and click "Show more" button with multiple selectors
+            const showMoreSelectors = [
+                '#description-inline-expander-inner button',
+                '#description button[aria-label*="more"]',
+                '#description-inner button[aria-label*="more"]',
+                'ytd-text-inline-expander-renderer button',
+                '#description ytd-inline-expander-renderer button',
+                'button[aria-label*="Show more"]',
+                'button[aria-label*="show more"]',
+                '.more-button',
+                '[class*="show-more"] button',
+                'yt-button-shape button[aria-label*="more"]'
+            ];
+            
+            let expandedSuccessfully = false;
+            
+            for (const selector of showMoreSelectors) {
+                const showMoreButton = document.querySelector(selector);
+                if (showMoreButton && 
+                    showMoreButton.textContent.toLowerCase().includes('more') && 
+                    showMoreButton.offsetParent !== null) { // Check if button is visible
+                    
+                    console.log(`Found "Show more" button with selector: ${selector}`);
+                    showMoreButton.click();
+                    expandedSuccessfully = true;
+                    
+                    // Wait for the description to expand
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    break;
+                }
+            }
+            
+            if (expandedSuccessfully) {
+                console.log('Description expanded, waiting for content to load...');
+                // Give extra time for the expanded content to fully load
+                await new Promise(resolve => setTimeout(resolve, 1500));
+            }
+            
+            // Step 2: Try multiple approaches to get the full description
+            const descriptionSelectors = [
+                // Try expanded content first
+                '#description-inline-expander-content',
+                '#description-inline-expander',
+                'yt-attributed-string[slot="content"]',
+                '#description-inner yt-attributed-string',
+                '#description yt-attributed-string[slot="content"]',
+                'ytd-expander-content yt-attributed-string',
+                
+                // Current layout selectors
+                '#description-text',
+                '#description-inner',
+                '#description .content',
+                '.ytd-expandable-video-description-body-renderer',
+                
+                // Fallback to meta tags
+                'meta[property="og:description"]',
+                'meta[name="description"]'
+            ];
+            
+            let bestDescription = '';
+            let foundElement = null;
+            
+            for (const selector of descriptionSelectors) {
+                const element = document.querySelector(selector);
+                if (element) {
+                    let currentText = '';
+                    
+                    if (element.tagName === 'META') {
+                        currentText = element.getAttribute('content') || '';
+                    } else {
+                        currentText = element.textContent.trim();
+                    }
+                    
+                    // Prefer longer, non-truncated descriptions
+                    if (currentText.length > bestDescription.length && 
+                        !currentText.endsWith('...') && 
+                        !currentText.includes('Show more')) {
+                        bestDescription = currentText;
+                        foundElement = element;
+                        console.log(`Found better description with selector: ${selector}, length: ${currentText.length}`);
+                    }
+                }
+            }
+            
+            // Step 3: If we found expanded content, try to get structured text
+            if (foundElement && foundElement.querySelector) {
+                // Try to get text from individual spans or divs within the description
+                const textElements = foundElement.querySelectorAll('span, div, p');
+                if (textElements.length > 0) {
+                    const structuredText = Array.from(textElements)
+                        .map(el => el.textContent.trim())
+                        .filter(text => text.length > 0)
+                        .join(' ');
+                    
+                    if (structuredText.length > bestDescription.length) {
+                        bestDescription = structuredText;
+                        console.log(`Found structured text, length: ${structuredText.length}`);
+                    }
+                }
+            }
+            
+            // Step 4: Clean up and format the description
+            if (bestDescription) {
+                // Remove multiple spaces and normalize whitespace
+                descriptionText = bestDescription
+                    .replace(/\s+/g, ' ')
+                    .replace(/\n\s*\n/g, '\n')
+                    .trim();
+                
+                // If still very long, truncate but at a sentence boundary if possible
+                if (descriptionText.length > 2000) {
+                    const truncated = descriptionText.substring(0, 2000);
+                    const lastPeriod = truncated.lastIndexOf('.');
+                    const lastNewline = truncated.lastIndexOf('\n');
+                    const cutPoint = Math.max(lastPeriod, lastNewline);
+                    
+                    if (cutPoint > 1500) { // Only cut at sentence/paragraph if it's not too short
+                        descriptionText = truncated.substring(0, cutPoint + 1);
+                    } else {
+                        descriptionText = truncated + '...';
+                    }
+                }
+                
+                details.description = descriptionText;
+                console.log(`Final description length: ${descriptionText.length}`);
+            } else {
+                console.log('No description found with any selector');
+                details.description = 'N/A';
+            }
+            
+        } catch (error) {
+            console.error('Error in extractEnhancedDescription:', error);
+            details.description = 'N/A';
+        }
+    }    // Extract YouTube video details from the page
+    async function extractYouTubeVideoDetails() {
+        return new Promise(async (resolve, reject) => {
+            try {
+                const details = {};
+
+                // Extract video title - try multiple selectors
+                let titleElement = document.querySelector('h1.style-scope.ytd-video-primary-info-renderer') ||
+                                 document.querySelector('h1.ytd-video-primary-info-renderer') ||
+                                 document.querySelector('#title h1') ||
+                                 document.querySelector('h1[class*="title"]') ||
+                                 document.querySelector('meta[property="og:title"]');
+                
+                if (titleElement) {
+                    if (titleElement.tagName === 'META') {
+                        details.title = titleElement.getAttribute('content');
+                    } else {
+                        details.title = titleElement.textContent.trim();
+                    }
+                }
+
+                // Extract channel name - try multiple selectors
+                let channelElement = document.querySelector('ytd-channel-name a') ||
+                                   document.querySelector('#owner-name a') ||
+                                   document.querySelector('#channel-name a') ||
+                                   document.querySelector('.ytd-channel-name a') ||
+                                   document.querySelector('#upload-info #channel-name a') ||
+                                   document.querySelector('link[itemprop="name"]');
+                
+                if (channelElement) {
+                    if (channelElement.tagName === 'LINK') {
+                        details.channelTitle = channelElement.getAttribute('content');
+                    } else {
+                        details.channelTitle = channelElement.textContent.trim();
+                    }
+                }
+
+                // Extract view count - try multiple selectors
+                let viewElement = document.querySelector('.ytd-video-view-count-renderer') ||
+                                document.querySelector('#info .view-count') ||
+                                document.querySelector('#count .style-scope.ytd-video-view-count-renderer') ||
+                                document.querySelector('#info-strings yt-formatted-string');
+                
+                if (viewElement) {
+                    let viewText = viewElement.textContent.trim();
+                    // Extract numbers from view count text
+                    const viewMatch = viewText.match(/([\d,]+(?:\.\d+)?)\s*([KMB]?)\s*views?/i);
+                    if (viewMatch) {
+                        let number = viewMatch[1].replace(/,/g, '');
+                        const multiplier = viewMatch[2].toUpperCase();
+                        
+                        // Convert K, M, B to actual numbers
+                        if (multiplier === 'K') {
+                            number = Math.round(parseFloat(number) * 1000);
+                        } else if (multiplier === 'M') {
+                            number = Math.round(parseFloat(number) * 1000000);
+                        } else if (multiplier === 'B') {
+                            number = Math.round(parseFloat(number) * 1000000000);
+                        }
+                        
+                        details.viewCount = number.toString();
+                    } else {
+                        // Fallback: just extract numbers
+                        const numberMatch = viewText.match(/([\d,]+)/);
+                        if (numberMatch) {
+                            details.viewCount = numberMatch[1].replace(/,/g, '');
+                        }
+                    }
+                }
+
+                // Extract like count - try multiple selectors
+                let likeElement = document.querySelector('#segmented-like-button button[aria-label*="like"]') ||
+                                document.querySelector('.ytd-toggle-button-renderer button[aria-label*="like"]') ||
+                                document.querySelector('button[aria-label*="like this video"]');
+                
+                if (likeElement) {
+                    const ariaLabel = likeElement.getAttribute('aria-label');
+                    if (ariaLabel) {
+                        const likeMatch = ariaLabel.match(/([\d,]+(?:\.\d+)?)\s*([KMB]?)/);
+                        if (likeMatch) {
+                            let number = likeMatch[1].replace(/,/g, '');
+                            const multiplier = likeMatch[2].toUpperCase();
+                            
+                            // Convert K, M, B to actual numbers
+                            if (multiplier === 'K') {
+                                number = Math.round(parseFloat(number) * 1000);
+                            } else if (multiplier === 'M') {
+                                number = Math.round(parseFloat(number) * 1000000);
+                            } else if (multiplier === 'B') {
+                                number = Math.round(parseFloat(number) * 1000000000);
+                            }
+                              details.likeCount = number.toString();
+                        }
+                    }
+                }
+
+                // Extract description using enhanced function
+                await extractEnhancedDescription(details);
+
+                console.log('Extracted video details:', details);
+                
+                // Return details even if some are missing - background script will handle fallbacks
+                resolve({ details });
+
+            } catch (error) {
+                console.error('Error extracting video details:', error);
+                reject(new Error(`Error extracting video details: ${error.message}`));
             }
         });
     }
+
 })();

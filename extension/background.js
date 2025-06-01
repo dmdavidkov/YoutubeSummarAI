@@ -40,7 +40,7 @@ Report all three, but flag them appropriately so the reader knows which is which
 
 9. Organize the summary clearly using H2 and H3 subheadings as appropriate to reinforce the logical flow. Utilize bullet points to enhance readability of longer paragraphs or list items. Selectively bold key terms for emphasis. Use blockquotes to highlight longer verbatim quotations.
 
-10. (!IMPORTANT) Generate clickable timestamp links for each mentioned part of the video, key point or quote used. Append them after the relevant text. To calculate the timestamp link follow these steps:
+10. Generate clickable timestamp links for each mentioned part of the video, key point or quote used. Append them after the relevant text. To calculate the timestamp link follow these steps:
 
 a. Note down the starting point of the relevant part of the video in H:MM:SS format (e.g. 0:14:16) 
 b. Convert the timestamp to total seconds: (hours × 3600) + (minutes × 60) + seconds
@@ -478,36 +478,71 @@ async function generateSummary(videoUrl) {
         if (!transcript || transcript.trim().length === 0) {
              sendMessageToContent({ action: 'updateSummaryStatus', status: 'Error: Transcript is empty, cannot generate summary.' }, false, true);
              return;
+        }        // Fetch Video Details
+        sendMessageToContent({ action: 'updateSummaryStatus', status: 'Extracting video details from page...' }, true, false);
+        let videoDetails = { title: 'N/A', channelTitle: 'N/A', viewCount: 'N/A', likeCount: 'N/A', description: 'N/A' }; // Default structure
+        
+        try {
+            // First try to extract video details from the YouTube page
+            const tabs = await new Promise(resolve => 
+                chrome.tabs.query({ active: true, currentWindow: true }, resolve)
+            );
+            
+            if (tabs[0] && tabs[0].url.includes('youtube.com/watch')) {
+                const pageDetailsResponse = await new Promise((resolve, reject) => {
+                    chrome.tabs.sendMessage(tabs[0].id, { action: 'extractVideoDetails' }, (response) => {
+                        if (chrome.runtime.lastError) {
+                            console.error('Runtime error when extracting video details:', chrome.runtime.lastError);
+                            reject(chrome.runtime.lastError);
+                        } else if (!response) {
+                            console.error('No response received from content script for video details');
+                            reject(new Error('No response from content script for video details'));
+                        } else {
+                            resolve(response);
+                        }
+                    });
+                });
+
+                if (pageDetailsResponse.details) {
+                    videoDetails = { ...videoDetails, ...pageDetailsResponse.details };
+                    sendMessageToContent({ action: 'updateSummaryStatus', status: 'Video details extracted from page.' }, false, false);
+                } else {
+                    console.warn('Failed to extract video details from page:', pageDetailsResponse.error);
+                }
+            }
+        } catch (error) {
+            console.warn('Error extracting video details from page:', error);
         }
 
-        // Conditionally Fetch Video Details
-        let videoDetails = { title: 'N/A', channelTitle: 'N/A', viewCount: 'N/A', likeCount: 'N/A', description: 'N/A' }; // Default structure
+        // If some details are still missing, try YouTube API as fallback
         const apiKeyItems = await new Promise(resolve => chrome.storage.sync.get(['youtubeApiKey'], resolve));
         const youtubeApiKey = apiKeyItems.youtubeApiKey;
 
-        if (youtubeApiKey) {
-            sendMessageToContent({ action: 'updateSummaryStatus', status: 'API key found. Fetching video details...' }, true, false);
+        if (youtubeApiKey && (videoDetails.title === 'N/A' || videoDetails.channelTitle === 'N/A')) {
+            sendMessageToContent({ action: 'updateSummaryStatus', status: 'API key found. Fetching additional video details...' }, true, false);
             const videoDetailsResponse = await fetchYouTubeVideoDetails(videoId, youtubeApiKey);
             if (videoDetailsResponse.details) {
-                videoDetails = videoDetailsResponse.details;
-                sendMessageToContent({ action: 'updateSummaryStatus', status: 'Video details fetched.' }, false, false);
+                // Merge API details with page details, preferring non-N/A values
+                Object.keys(videoDetailsResponse.details).forEach(key => {
+                    if (videoDetails[key] === 'N/A' || !videoDetails[key]) {
+                        videoDetails[key] = videoDetailsResponse.details[key];
+                    }
+                });
+                sendMessageToContent({ action: 'updateSummaryStatus', status: 'Additional video details fetched from API.' }, false, false);
             } else {
-                // Log the error but don't stop the process. Proceed with transcript-only.
                 console.warn('Failed to fetch video details with provided API key:', videoDetailsResponse.error);
-                sendMessageToContent({ action: 'updateSummaryStatus', status: 'Could not fetch video details. Proceeding with transcript only.' }, false, true);
-                // videoDetails remains the default structure
             }
-        } else {
-            sendMessageToContent({ action: 'updateSummaryStatus', status: 'No API key found. Proceeding with transcript only.' }, false, false);
-            // videoDetails remains the default structure
         }
-          sendMessageToContent({ action: 'updateSummaryStatus', status: 'Preparing prompt...' }, true, false);
-        
-        // Debug video details
+
+        sendMessageToContent({ action: 'updateSummaryStatus', status: 'Preparing prompt...' }, true, false);
+          // Debug video details
         console.log("Video details object:", videoDetails);
         console.log("Video details keys:", Object.keys(videoDetails));
         console.log("Title:", videoDetails.title);
         console.log("Channel:", videoDetails.channelTitle);
+        console.log("Views:", videoDetails.viewCount);
+        console.log("Likes:", videoDetails.likeCount);
+        console.log("Description length:", videoDetails.description ? videoDetails.description.length : 'N/A');
         
         // Prepare data for prompt template
         const promptData = {
