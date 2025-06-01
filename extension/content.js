@@ -127,14 +127,22 @@
             console.error('Primary or Secondary div not found within #columns.');
             return;
         }
+        if (primaryDiv) {
+            // Store original styles to revert them later
+            primaryDiv.setAttribute('data-original-style-flex', primaryDiv.style.flex || '');
+            primaryDiv.setAttribute('data-original-style-min-width', primaryDiv.style.minWidth || '');
 
+            // Allow primaryDiv to shrink and take up remaining space
+            primaryDiv.style.flex = '1 1 auto'; // Grow:1, Shrink:1, Basis:auto (or '1 1 0%' could also work)
+            primaryDiv.style.minWidth = '0';    // Essential to allow shrinking below its content's default min-width
+        }
         // Create a wrapper for the secondary content and our docked div
         const wrapper = document.createElement('div');
         wrapper.id = 'secondary-wrapper';
         wrapper.style.cssText = `
             display: flex;
             flex-direction: column;
-            max-width: 35vw;
+            max-width: 30vw;
             height: ${primaryDiv.style.height};
             right: 0;
             top: 0;
