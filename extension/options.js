@@ -3,14 +3,53 @@ let settings;
 
 // Retrieve settings from storage
 chrome.storage.sync.get(null, (items) => {
-    console.log("Retrieved settings from storage:", items);
-    // Use the settings from storage
+    console.log("Retrieved settings from storage:", items);    // Use the settings from storage
     settings = {
         youtubeApiKey: items.youtubeApiKey || '',
-        aiProvider: items.aiProvider || '',
+        aiProvider: items.aiProvider || 'you',
         transcriptionMethod: items.transcriptionMethod || 'youtube_captions',
         keepWindowActive: items.keepWindowActive || false,
-        providers: items.providers || {}
+        providers: items.providers || {
+            you: {
+                url: 'https://you.com/?chatMode=custom',
+                inputSelector: '#search-input-textarea',
+                buttonSelector: 'button[type="submit"]',
+                confirmButtonSelector: '[data-eventactionname="save_sources_modal"]', 
+                resultSelector: '[data-testid="youchat-answer-turn-0"]'
+            },
+            perplexity: {
+                url: 'https://www.perplexity.ai/',
+                inputSelector: '[placeholder="Ask anything..."]',
+                buttonSelector: '[aria-label="Submit"]',
+                resultSelector: '.prose'
+            },
+            phind: {
+                url: 'https://www.phind.com/',
+                inputSelector: 'div:nth-child(1) > textarea',
+                buttonSelector: 'button:nth-child(7)',
+                resultSelector: '#__next > div > div > div.col-lg-12.sidebar > main > div > div.container-xl > div.row > div.col-12.mt-5 > div:nth-child(1) > div'
+            },
+            gemini: {
+                url: 'https://aistudio.google.com/app/prompts/new_chat',
+                inputSelector: 'body > app-root > div > div > div > div > span > ms-prompt-switcher > ms-chunk-editor > section > footer > div.input-wrapper > div.text-wrapper > ms-chunk-input > section > ms-text-chunk > textarea',
+                buttonSelector: 'body > app-root > div > div > div > div > span > ms-prompt-switcher > ms-chunk-editor > section > footer > div.input-wrapper > div:nth-child(3) > run-button > button',
+                resultSelector: 'ms-chat-turn:nth-child(2) > div > div.prompt-container'
+            },
+            chatgpt: {
+                url: 'https://chatgpt.com',
+                inputSelector: '#prompt-textarea',
+                buttonSelector: '[data-testid="send-button"]',
+                confirmButtonSelector: '',
+                resultSelector: '[data-message-author-role="assistant"]'
+            },
+            custom: {
+                url: '',
+                inputSelector: '',
+                buttonSelector: '',
+                confirmButtonSelector: '',
+                resultSelector: ''
+            }
+        }
     };
 
     console.log("Initialized settings:", settings);
@@ -163,13 +202,17 @@ function restoreOptions() {
                 }
                 console.log(`Restored ${field}:`, element.value);
             }
-        });
-
-        // Handle transcriptionMethod separately
+        });        // Handle transcriptionMethod and keepWindowActive separately
         const transcriptionMethodElement = document.getElementById('transcriptionMethod');
         if (transcriptionMethodElement) {
             transcriptionMethodElement.value = items.transcriptionMethod || 'youtube_captions';
             console.log(`Restored transcriptionMethod:`, transcriptionMethodElement.value);
+        }
+
+        const keepWindowActiveElement = document.getElementById('keepWindowActive');
+        if (keepWindowActiveElement) {
+            keepWindowActiveElement.value = items.keepWindowActive === true ? 'true' : 'false';
+            console.log(`Restored keepWindowActive:`, keepWindowActiveElement.value);
         }
 
         showStatus('Settings loaded successfully!', 'success', 2000);

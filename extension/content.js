@@ -24,11 +24,21 @@
         console.log("Initializing content script");
         setupMessageListener();
         setupObserverForCurrentSite();
-    }
-
-    function setupMessageListener() {
+    }    function setupMessageListener() {
         chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             console.log("Message received in content script:", request);
+            console.log("🔍 CONTENT SCRIPT DEBUG: Current URL:", window.location.href);
+            console.log("🔍 CONTENT SCRIPT DEBUG: Tab title:", document.title);
+            
+            // Debug: Log specifically for pastePrompt action
+            if (request.action === 'pastePrompt') {
+                console.log("🔍 CONTENT: pastePrompt message received!");
+                console.log("🔍 CONTENT: Request keys:", Object.keys(request));
+                console.log("🔍 CONTENT: Provider:", request.provider);
+                console.log("🔍 CONTENT: VideoUrl:", request.videoUrl);
+                console.log("🔍 CONTENT: Prompt exists:", !!request.prompt);
+                console.log("🔍 CONTENT: Prompt length:", request.prompt ? request.prompt.length : 'undefined');
+            }
             
             switch(request.action) {
                 case 'toggleDockedDiv':
@@ -50,11 +60,26 @@
                     break;
                 case 'updateSummaryContent':
                     updateSummaryContent(request.content, request.isLoading, request.isError);
-                    break;
-                case 'getContent':
-                    const resultElement = document.querySelector(providerSettings[request.provider].resultSelector);
-                    const content = resultElement ? resultElement.innerHTML : '';
-                    sendResponse({ content: content });
+                    break;                case 'getContent':
+                    try {
+                        // Get the result selector from the request or from providerSettings
+                        const resultSelector = request.selectors?.resultSelector || 
+                                             (providerSettings && providerSettings[request.provider]?.resultSelector);
+                        
+                        if (!resultSelector) {
+                            console.error('No result selector available for provider:', request.provider);
+                            sendResponse({ content: '', error: 'No result selector found' });
+                            break;
+                        }
+                        
+                        const resultElement = document.querySelector(resultSelector);
+                        const content = resultElement ? resultElement.innerHTML : '';
+                        console.log('getContent response - selector:', resultSelector, 'content length:', content.length);
+                        sendResponse({ content: content });
+                    } catch (error) {
+                        console.error('Error in getContent handler:', error);
+                        sendResponse({ content: '', error: error.message });
+                    }
                     break;
                 case 'copyContent':
                     const textArea = document.createElement('textarea');
@@ -62,16 +87,20 @@
                     document.body.appendChild(textArea);
                     textArea.select();
                     try {
-                        document.execCommand('copy');
-                        console.log('Content copied successfully');
+                        document.execCommand('copy');                    console.log('Content copied successfully');
                     } catch (err) {
                         console.error('Failed to copy content:', err);
                     }
                     document.body.removeChild(textArea);
                     break;
-                case 'closeTab':
-                    closeNewTab(request.prompt, request.content);
-                    break;
+
+                case 'extractTranscript':
+                    extractYouTubeTranscript().then(result => {
+                        sendResponse(result);
+                    }).catch(error => {
+                        sendResponse({ error: error.message });
+                    });
+                    return true; // Indicate async response
             }
 
             // Send an immediate response
@@ -415,19 +444,35 @@
         });
 
         return observer;
-    }
-
-    function handlePastePrompt(request) {
+    }    function handlePastePrompt(request) {
         const provider = request.provider;
         const selectors = request.selectors;
         console.log("Pasting prompt for provider:", provider);
         console.log("Selectors:", selectors);
+        
+        // Debug: Log what we received
+        console.log("🔍 CONTENT: Received prompt length:", request.prompt ? request.prompt.length : 'undefined');
+        console.log("🔍 CONTENT: Prompt preview (first 1000 chars):", request.prompt ? request.prompt.substring(0, 1000) : 'undefined');
+        console.log("🔍 CONTENT: Video details section in received prompt:", request.prompt && request.prompt.includes('<video_details>') ? 'FOUND' : 'NOT FOUND');
+        
+        // Check specifically for the populated content in received prompt
+        if (request.prompt) {
+            const videoDetailsMatch = request.prompt.match(/<video_details>([\s\S]*?)<\/video_details>/);
+            if (videoDetailsMatch) {
+                console.log("🔍 CONTENT: Video details content length:", videoDetailsMatch[1].length);
+                console.log("🔍 CONTENT: Video details content preview:", videoDetailsMatch[1].substring(0, 500));
+            } else {
+                console.log("🔍 CONTENT: ERROR: No video_details section found in received prompt!");
+            }
+        }
         
         waitForInputField(selectors.inputSelector, element => {
             console.log("Input element found");
             
             // 2. Assign request.prompt to the global variable
             globalPrompt = request.prompt;
+            
+            console.log("🔍 CONTENT: About to paste prompt to element. GlobalPrompt length:", globalPrompt ? globalPrompt.length : 'undefined');
             
             if (element.tagName.toLowerCase() === 'input' || element.tagName.toLowerCase() === 'textarea') {
                 // 3. Use the global variable instead of request.prompt
@@ -443,6 +488,9 @@
             } else {
                 console.error("Unsupported input element type");
             }
+            
+            // Debug: Check what was actually pasted
+            console.log("🔍 CONTENT: After pasting - element value length:", element.value ? element.value.length : (element.textContent ? element.textContent.length : 'undefined'));
             
             // Add a 1-second delay before executing handleButtonClicks
             setTimeout(() => {
@@ -521,6 +569,175 @@
     // Add this to your content script
     setInterval(() => {
         chrome.runtime.sendMessage({ action: 'contentScriptAlive' });
-    }, 25000);
+    }, 25000);    // Helper function to format timestamps
+    function formatTimestamp(timestamp) {
+        // Handle various timestamp formats and normalize to HH:MM:SS
+        if (!timestamp) return '';
+        
+        // Remove any brackets or extra characters
+        timestamp = timestamp.replace(/[\[\]]/g, '').trim();
+        
+        // Handle formats like "0:0:05", "0:5", "1:23:45"
+        const parts = timestamp.split(':');
+        
+        if (parts.length === 3) {
+            // Already HH:MM:SS format, just ensure proper padding
+            const hours = parts[0].padStart(1, '0');
+            const minutes = parts[1].padStart(2, '0');
+            const seconds = parts[2].padStart(2, '0');
+            return `${hours}:${minutes}:${seconds}`;
+        } else if (parts.length === 2) {
+            // MM:SS format, add hours
+            const minutes = parts[0].padStart(2, '0');
+            const seconds = parts[1].padStart(2, '0');
+            return `0:${minutes}:${seconds}`;
+        } else if (parts.length === 1 && /^\d+$/.test(parts[0])) {
+            // Just seconds
+            const totalSeconds = parseInt(parts[0]);
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+            return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+        
+        // If none of the above, return as is
+        return timestamp;
+    }
 
+    // Extract YouTube transcript from the page
+    async function extractYouTubeTranscript() {
+        return new Promise((resolve, reject) => {
+            try {
+                // First, try to find if transcript is already visible
+                let transcriptButton = document.querySelector('button[aria-label*="transcript" i], button[aria-label*="Show transcript" i]');
+                
+                if (!transcriptButton) {
+                    // Look for transcript button in the video description area
+                    transcriptButton = document.querySelector('ytd-video-description-transcript-section-renderer button');
+                }
+
+                if (!transcriptButton) {
+                    // Look for more transcript button variations
+                    const buttons = document.querySelectorAll('button');
+                    for (const button of buttons) {
+                        const text = button.textContent.toLowerCase();
+                        const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
+                        if (text.includes('transcript') || ariaLabel.includes('transcript')) {
+                            transcriptButton = button;
+                            break;
+                        }
+                    }
+                }
+
+                if (!transcriptButton) {
+                    reject(new Error('Transcript button not found. Video may not have captions available.'));
+                    return;
+                }
+
+                // Click the transcript button to show transcript
+                transcriptButton.click();
+
+                // Wait for transcript panel to load
+                setTimeout(() => {
+                    try {
+                        // Look for transcript text elements
+                        const transcriptSegments = document.querySelectorAll(
+                            'ytd-transcript-segment-renderer, ' +
+                            '[data-params*="transcript"] .segment-text, ' +
+                            '.ytd-transcript-segment-renderer .segment-text, ' +
+                            '.ytd-transcript-segment-list-renderer .segment-text'
+                        );
+
+                        if (transcriptSegments.length === 0) {
+                            // Try alternative selectors
+                            const altSegments = document.querySelectorAll('.cue-group .cue');
+                            if (altSegments.length === 0) {
+                                reject(new Error('Transcript segments not found after opening transcript panel.'));
+                                return;
+                            }
+                        }                        // Extract text with timestamps from transcript segments
+                        const segments = Array.from(transcriptSegments.length > 0 ? transcriptSegments : document.querySelectorAll('.cue-group .cue'));
+                        const processedSegments = [];
+                        
+                        segments.forEach(segment => {
+                            try {
+                                // Try to find timestamp element within the segment
+                                const timestampElement = segment.querySelector('.segment-timestamp, .cue-timestamp, [class*="timestamp"]');
+                                let timestamp = '';
+                                
+                                if (timestampElement) {
+                                    timestamp = timestampElement.textContent.trim();
+                                } else {
+                                    // Try to extract timestamp from data attributes
+                                    const startTime = segment.getAttribute('data-start-time') || 
+                                                    segment.getAttribute('start') ||
+                                                    segment.getAttribute('data-start');
+                                    if (startTime) {
+                                        // Convert seconds to timestamp format
+                                        const totalSeconds = parseFloat(startTime);
+                                        const hours = Math.floor(totalSeconds / 3600);
+                                        const minutes = Math.floor((totalSeconds % 3600) / 60);
+                                        const seconds = Math.floor(totalSeconds % 60);
+                                        timestamp = `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                                    } else {
+                                        // Try to extract from text content
+                                        const fullText = segment.textContent.trim();
+                                        const timestampMatch = fullText.match(/^(\d+:\d+(?::\d+)?)/);
+                                        if (timestampMatch) {
+                                            timestamp = timestampMatch[1];
+                                        }
+                                    }
+                                }
+                                
+                                // Get the text content, removing timestamps if present
+                                let text = segment.textContent.trim();
+                                text = text.replace(/^\d+:\d+(?::\d+)?\s*/, '').trim();
+                                
+                                if (text && text.length > 0) {
+                                    // Format timestamp properly
+                                    const formattedTimestamp = timestamp ? formatTimestamp(timestamp) : '';
+                                    processedSegments.push({
+                                        timestamp: formattedTimestamp,
+                                        text: text
+                                    });
+                                }
+                            } catch (error) {
+                                console.warn('Error processing transcript segment:', error);
+                                const text = segment.textContent.trim().replace(/^\d+:\d+(?::\d+)?\s*/, '').trim();
+                                if (text) {
+                                    processedSegments.push({
+                                        timestamp: '',
+                                        text: text
+                                    });
+                                }
+                            }
+                        });
+
+                        // Group segments and format output
+                        const transcriptText = processedSegments
+                            .map(seg => {
+                                if (seg.timestamp) {
+                                    return `[${seg.timestamp}] ${seg.text}`;
+                                } else {
+                                    return seg.text;
+                                }
+                            })
+                            .join(' ');
+
+                        if (!transcriptText || transcriptText.trim().length === 0) {
+                            reject(new Error('No transcript text could be extracted.'));
+                            return;
+                        }
+
+                        resolve({ transcript: transcriptText });
+                    } catch (error) {
+                        reject(new Error(`Error extracting transcript text: ${error.message}`));
+                    }
+                }, 2000); // Wait 2 seconds for transcript to load
+
+            } catch (error) {
+                reject(new Error(`Error accessing transcript: ${error.message}`));
+            }
+        });
+    }
 })();

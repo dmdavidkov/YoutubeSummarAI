@@ -1,23 +1,74 @@
-import { YoutubeTranscript } from './lib/youtube-transcript.esm.js';
-
 // background.js
 
 // Prompt Template String
 const PROMPT_TEMPLATE_STRING = `
-Generate a comprehensive summary of the YouTube video with the following details:
+1. Read the following video transcript carefully, because you'll be asked to perform series of tasks based on them (especially the transcript!):
 
-Video Title: {{title}}
-Channel: {{channel}}
-View Count: {{views}}
-Likes: {{likes}}
-
-Video Description:
-{{description}}
-
-Full Video Transcript:
+Channel name: {{channel}}
+Video title: {{title}}
+View count: {{views}}
+Likes count: {{likes}}
+Description: {{description}}
+Video URL: {{video_url}}
+Transcript: 
 {{transcript}}
 
-The summary should be well-structured, concise, and capture the key points and main topics discussed in the video. Use Markdown formatting for headings, lists, and emphasis where appropriate.
+2. The transcript is in the following format: 
+[H:MM:SS] transcribed text
+where H:MM:SS represents the exact timestamp when the text is spoken in the video (hours:minutes:seconds format).
+- Each timestamp shows when that particular segment of speech begins
+- Use these timestamps to create precise navigation links in your summary
+
+3. You are an award-winning journalist, you have a reputation for producing informative and unbiased summaries. Your task is to carefully review the video content and extract the crucial facts, presenting them in a clear and organized manner. Prioritize accuracy and objectivity, allowing the information to speak for itself without editorializing. You know many languages and can provide summaries in English (translation from source language is also acceptable).
+
+4. Make a clear distinction between:
+a. presented factual and objective data and information
+b. personal experience, opinions and subjective information 
+c. information presented as a fact, but might need cross-checking
+Report all three, but flag them appropriately so the reader knows which is which. If you are unsure or don't have enough information to provide a confident categorization, simply say "I don't know" or "I'm not sure."
+
+5. Use blended summarization technique combining abstractive summarization (70-90%) extractive summarization (10-30%). Adjust this ratio as needed based on the type of content. Endeavor to address the full breadth of the transcript without significant omissions. Make sure the extracted quotes are short, important and impactful to the narrative.
+
+6. Aim for a summary length that is approximately 20% of the full video transcript. For example, if the transcript is 5000 words long, target a summary of roughly 1000 words. Try to cover the video in full without gaps. However, if the transcript is exceptionally long (over 10,000 words):
+   a. Focus on providing timestamps that cover the entire content.
+   b. Use shorter summaries for each section to maintain a comprehensive overview.
+   c. Ensure that the overall structure still captures the main points and flow of the video.
+
+7. Break down the summary into a chain of key sections or topics. Use these to logically structure it, creating an H1 heading for each main point in the chain of reasoning. Follow the natural timeflow of the video.
+
+8. Under each H1 section heading, write 1-3 sentences concisely summarizing the essential information from that section. Aim for an even coverage of the full video.
+
+9. Organize the summary clearly using H2 and H3 subheadings as appropriate to reinforce the logical flow. Utilize bullet points to enhance readability of longer paragraphs or list items. Selectively bold key terms for emphasis. Use blockquotes to highlight longer verbatim quotations.
+
+10. (!IMPORTANT) Generate clickable timestamp links for each mentioned part of the video, key point or quote used. Append them after the relevant text. To calculate the timestamp link follow these steps:
+
+a. Note down the starting point of the relevant part of the video in H:MM:SS format (e.g. 0:14:16) 
+b. Convert the timestamp to total seconds: (hours × 3600) + (minutes × 60) + seconds
+   Example: 0:14:16 = (0 × 3600) + (14 × 60) + 16 = 0 + 840 + 16 = 856 seconds
+c. Append "&t=X" to the video URL, replacing X with the total seconds (e.g. &t=856)
+d. Format the full link as: [H:MM:SS]({{video_url}}&t=X) (e.g. [0:14:16]({{video_url}}&t=856))
+
+It is crucial to select precise starting timestamps for the links. For example, consider the following transcript excerpt:
+
+[0:01:10] We train these models to spend more time thinking through problems before they respond, much like a person would.
+[0:01:15] Through training, they learn to refine their thinking process, try different strategies and recognize their mistakes.
+[0:01:20] In our test, the next model update performs similarly to PhD students on challenging benchmark tasks in physics, chemistry, and biology.
+[0:01:29] We also found that it excels in math and coding in a qualifying exam in the International Mathematics Olympiad.
+
+The correct starting timestamp for the quote "In our test, the next model update performs similarly to PhD students" would be [0:01:20], because that is when this text appears in the transcript. Time calculated: (0 × 3600) + (1 × 60) + 20 = 80 seconds, so the link would be [0:01:20]({{video_url}}&t=80)
+
+- If the timestamp you want to highlight is at the middle or the end of the transcript row, you'll have to estimate the time it was spoken:
+For example: in the transcript example above to quote "the next model update performs similarly to PhD students on challenging benchmark tasks in physics, chemistry, and biology" the correct starting timestamp would be estimated as [0:01:22], because we add 2 seconds to the start time of the quote to make sure we are not quoting the beginning of the timestamped row.
+
+11. If there are sponsored segments and ADs in the video, note and timestamp them in the summary but don't summarize them.
+
+12. Vary the sentence structures throughout to maintain an engaging narrative flow. Ensure smooth transitions between sentences and sections. Adopt a consistent voice aligned with the original video's tone.
+
+13. Revise the full summary, checking for any unintended bias or editorializing. Aim to neutrally represent the content of the original video. Consider engaging in a feedback loop with a human reviewer to iteratively optimize the summary.
+
+14. Skip any explanations of what you are doing and why, just write the summary. Don't address the receiver of the summary, just write the summary. Don't add notes and explanations in the end.
+
+15. Provide your final video summary, ready for publication. Use all known Markdown operators to present the output.
 `;
 
 // Default settings
@@ -76,6 +127,16 @@ chrome.runtime.onInstalled.addListener((details) => {
             chrome.storage.sync.set(newSettings, () => {
                 console.log('Default settings have been set or updated.');
             });
+        });
+    }
+});
+
+// Also ensure storage is initialized when service worker starts
+chrome.storage.sync.get(['providers'], (items) => {
+    if (!items.providers || Object.keys(items.providers).length === 0) {
+        console.log('Providers not found in storage, initializing with defaults');
+        chrome.storage.sync.set({ providers: DEFAULT_SETTINGS.providers }, () => {
+            console.log('Default providers initialized');
         });
     }
 });
@@ -251,29 +312,48 @@ function getVideoId(url) {
     return null;
 }
 
-// Fetch YouTube Transcript using the locally imported youtube-transcript library
+// Fetch YouTube Transcript using DOM extraction
 async function fetchYouTubeTranscript(videoId) { 
-    sendMessageToContent({ action: 'updateSummaryStatus', status: 'Fetching transcript using local library...' }, true, false);
+    sendMessageToContent({ action: 'updateSummaryStatus', status: 'Fetching transcript from YouTube page...' }, true, false);
 
     try {
-        const transcriptParts = await YoutubeTranscript.fetchTranscript(videoId);
-        if (!transcriptParts || transcriptParts.length === 0) {
-            sendMessageToContent({ action: 'updateSummaryStatus', status: "No transcript found or video is invalid/private.", isError: true }, false, true);
-            return { error: "No transcript found or video is invalid/private (youtube-transcript)." };
+        // Get the current YouTube tab
+        const tabs = await new Promise(resolve => 
+            chrome.tabs.query({ active: true, currentWindow: true }, resolve)
+        );
+        
+        if (!tabs[0] || !tabs[0].url.includes('youtube.com/watch')) {
+            return { error: "Not on a YouTube video page." };
+        }        // Send message to content script to extract transcript
+        const response = await new Promise((resolve, reject) => {
+            chrome.tabs.sendMessage(tabs[0].id, { action: 'extractTranscript' }, (response) => {
+                if (chrome.runtime.lastError) {
+                    console.error('Runtime error when extracting transcript:', chrome.runtime.lastError);
+                    reject(chrome.runtime.lastError);
+                } else if (!response) {
+                    console.error('No response received from content script');
+                    reject(new Error('No response from content script - make sure you are on a YouTube video page'));
+                } else {
+                    resolve(response);
+                }
+            });
+        });
+
+        if (response.error) {
+            sendMessageToContent({ action: 'updateSummaryStatus', status: response.error }, false, true);
+            return { error: response.error };
         }
-        const transcriptText = transcriptParts.map(part => part.text).join(' ');
-        sendMessageToContent({ action: 'updateSummaryStatus', status: 'Transcript fetched successfully.' }, false, false);
-        return { transcript: transcriptText };
+
+        if (!response.transcript || response.transcript.trim().length === 0) {
+            sendMessageToContent({ action: 'updateSummaryStatus', status: "No transcript found or video has no captions.", isError: true }, false, true);
+            return { error: "No transcript found or video has no captions." };
+        }
+
+        sendMessageToContent({ action: 'updateSummaryStatus', status: 'Transcript extracted successfully.' }, false, false);
+        return { transcript: response.transcript };
     } catch (error) {
-        console.error("Error fetching transcript with youtube-transcript:", error);
-        let errorMessage = "Failed to fetch transcript.";
-        if (error.message && error.message.toLowerCase().includes("subtitles not found")) {
-            errorMessage = "No subtitles found for this video.";
-        } else if (error.message && error.message.toLowerCase().includes("disabled subtitles")) {
-            errorMessage = "Subtitles are disabled for this video.";
-        } else if (error.message) {
-            errorMessage = `Error: ${error.message.substring(0,100)}`; // Keep it short
-        }
+        console.error("Error fetching transcript:", error);
+        const errorMessage = `Failed to extract transcript: ${error.message || 'Unknown error'}`;
         sendMessageToContent({ action: 'updateSummaryStatus', status: errorMessage }, false, true);
         return { error: errorMessage };
     }
@@ -325,12 +405,26 @@ async function fetchYouTubeVideoDetails(videoId, apiKey) { // apiKey is still ne
 
 // Render Prompt Function
 function renderPrompt(templateString, data) {
+    console.log("renderPrompt called with:", { templateLength: templateString.length, dataKeys: Object.keys(data) });
+    
     let prompt = templateString;
     for (const key in data) {
         if (Object.prototype.hasOwnProperty.call(data, key)) {
-            prompt = prompt.replace(new RegExp('{{' + key + '}}', 'g'), data[key]);
+            const value = data[key] || 'N/A'; // Ensure we don't replace with undefined/null
+            const placeholder = '{{' + key + '}}';
+            const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+            
+            console.log(`Replacing ${placeholder} with: "${value}"`);
+            prompt = prompt.replace(regex, value);
         }
     }
+    
+    // Check if any placeholders remain unreplaced
+    const remainingPlaceholders = prompt.match(/\{\{[^}]+\}\}/g);
+    if (remainingPlaceholders) {
+        console.warn("Unreplaced placeholders found:", remainingPlaceholders);
+    }
+    
     return prompt;
 }
 
@@ -407,9 +501,14 @@ async function generateSummary(videoUrl) {
             sendMessageToContent({ action: 'updateSummaryStatus', status: 'No API key found. Proceeding with transcript only.' }, false, false);
             // videoDetails remains the default structure
         }
+          sendMessageToContent({ action: 'updateSummaryStatus', status: 'Preparing prompt...' }, true, false);
         
-        sendMessageToContent({ action: 'updateSummaryStatus', status: 'Preparing prompt...' }, true, false);
-
+        // Debug video details
+        console.log("Video details object:", videoDetails);
+        console.log("Video details keys:", Object.keys(videoDetails));
+        console.log("Title:", videoDetails.title);
+        console.log("Channel:", videoDetails.channelTitle);
+        
         // Prepare data for prompt template
         const promptData = {
             title: videoDetails.title,
@@ -417,13 +516,18 @@ async function generateSummary(videoUrl) {
             views: videoDetails.viewCount,      // Corrected from viewCount
             likes: videoDetails.likeCount || 'N/A',
             description: videoDetails.description,
+            video_url: videoUrl,
             transcript: transcript
         };
+        
+        // Debug prompt data
+        console.log("Prompt data object:", promptData);
+        console.log("Prompt data keys:", Object.keys(promptData));
         
         // Render the prompt
         const promptForAI = renderPrompt(PROMPT_TEMPLATE_STRING, promptData);
         
-        console.log("Prepared prompt for AI:", promptForAI.substring(0, 300) + "..."); // Log beginning of prompt
+        console.log("Prepared prompt for AI:", promptForAI.substring(0, 500) + "..."); // Log beginning of prompt
 
         // Always open the AI provider with the constructed prompt
         sendMessageToContent({ action: 'updateSummaryStatus', status: 'Opening AI provider to generate summary...' }, true, false);
@@ -435,12 +539,25 @@ async function generateSummary(videoUrl) {
 function openAIProviderAndPastePrompt(prompt, videoUrl) {
     chrome.storage.sync.get(['aiProvider', 'providers', 'keepWindowActive'], function(items) {
         const provider = items.aiProvider;
+        
+        // Check if providers object exists and initialize if needed
+        if (!items.providers) {
+            console.warn('Providers not found in storage, using default settings');
+            items.providers = DEFAULT_SETTINGS.providers;
+        }
+        
+        // Check if specific provider settings exist
+        if (!items.providers[provider]) {
+            console.error(`Provider settings not found for '${provider}'. Available providers:`, Object.keys(items.providers));
+            sendMessageToContent({ action: 'updateSummaryStatus', status: `Error: Provider '${provider}' is not configured. Please check your extension options.` }, false, true);
+            return;
+        }
+        
         const providerSettings = items.providers[provider];
         const keepWindowActive = items.keepWindowActive;
-        
-        chrome.windows.getCurrent({}, (currentWindow) => {
-            const width = 10;
-            const height = 10;
+          chrome.windows.getCurrent({}, (currentWindow) => {
+            const width = 80;
+            const height = 60;
             const left = currentWindow.left + currentWindow.width - width - 10;
             const top = currentWindow.top + currentWindow.height - height - 10;
 
@@ -453,11 +570,24 @@ function openAIProviderAndPastePrompt(prompt, videoUrl) {
                 top: Math.max(top, 0),
                 focused: true
             }, (window) => {
+                if (chrome.runtime.lastError) {
+                    console.error('Error creating window:', chrome.runtime.lastError);
+                    sendMessageToContent({ action: 'updateSummaryStatus', status: 'Error: Failed to create AI provider window' }, false, true);
+                    return;
+                }
+                
+                if (!window || !window.tabs || !window.tabs[0]) {
+                    console.error('Error: No tabs in created window');
+                    sendMessageToContent({ action: 'updateSummaryStatus', status: 'Error: Failed to access AI provider tab' }, false, true);
+                    return;
+                }
+                
                 const tab = window.tabs[0];
                 newTabId = tab.id;
                 
-                // Start monitoring for window close
-                startWindowCloseMonitoring(tab.id, provider);
+        // Start monitoring for window close
+        startWindowCloseMonitoring(tab.id, provider);
+        console.log('Started window close monitoring for provider:', provider, 'tabId:', tab.id);
 
                 // Only set up the focus listener if keepWindowActive is true
                 if (keepWindowActive) {
@@ -486,14 +616,55 @@ function openAIProviderAndPastePrompt(prompt, videoUrl) {
 
                 // Wait for the tab to finish loading
                 chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
-                    if (tabId === tab.id && info.status === 'complete') {
-                        // Remove the listener to avoid multiple calls
+                    if (tabId === tab.id && info.status === 'complete') {                        // Remove the listener to avoid multiple calls
                         chrome.tabs.onUpdated.removeListener(listener);
-                        
-                        // Wait a bit more to ensure the content script is fully loaded
+                          // Wait a bit more to ensure the content script is fully loaded
                         setTimeout(() => {
+                            // Send status update to the original YouTube tab (not the AI provider tab)
                             sendMessageToContent({ action: 'updateSummaryStatus', status: `Pasting prompt and generating summary on ${provider}...` }, true, false);
-                            chrome.tabs.sendMessage(tab.id, { 
+                              // Debug: Log what we're about to send
+                            console.log("🔍 DEBUG: About to send message to AI provider tab");
+                            console.log("🔍 Prompt length:", prompt.length);
+                            console.log("🔍 Prompt preview (first 1000 chars):", prompt.substring(0, 1000));
+                            console.log("🔍 Video details section in prompt:", prompt.includes('<video_details>') ? 'FOUND' : 'NOT FOUND');
+                            console.log("🔍 AI Provider tab ID:", tab.id);
+                            console.log("🔍 AI Provider URL:", providerSettings.url);
+                            
+                            // Check specifically for the populated content
+                            const videoDetailsMatch = prompt.match(/<video_details>([\s\S]*?)<\/video_details>/);
+                            if (videoDetailsMatch) {
+                                console.log("🔍 Video details content length:", videoDetailsMatch[1].length);
+                                console.log("🔍 Video details content preview:", videoDetailsMatch[1].substring(0, 500));
+                            } else {
+                                console.log("🔍 ERROR: No video_details section found in prompt!");
+                            }
+                            
+                            // First, test if content script is available on the AI provider tab
+                            chrome.tabs.sendMessage(tab.id, { action: 'test' }, (testResponse) => {
+                                if (chrome.runtime.lastError) {
+                                    console.error('🔍 Content script not available on AI provider tab:', chrome.runtime.lastError);
+                                    
+                                    // Try to inject content script manually
+                                    chrome.scripting.executeScript({
+                                        target: { tabId: tab.id },
+                                        files: ['marked.js', 'content.js']
+                                    }, () => {
+                                        if (chrome.runtime.lastError) {
+                                            console.error('🔍 Failed to inject content script:', chrome.runtime.lastError);
+                                            sendMessageToContent({ action: 'updateSummaryStatus', status: 'Error: Failed to load content script on AI provider' }, false, true);
+                                        } else {
+                                            console.log('🔍 Content script injected manually, retrying in 2 seconds...');
+                                            setTimeout(() => sendPastePromptMessage(), 2000);
+                                        }
+                                    });
+                                } else {
+                                    console.log('🔍 Content script is available on AI provider tab');
+                                    sendPastePromptMessage();
+                                }
+                            });
+                              function sendPastePromptMessage() {
+                                console.log('🔍 Sending pastePrompt message to AI provider tab:', tab.id);
+                                chrome.tabs.sendMessage(tab.id, {
                                 action: 'pastePrompt', 
                                 prompt: prompt, 
                                 videoUrl: videoUrl,
@@ -501,16 +672,17 @@ function openAIProviderAndPastePrompt(prompt, videoUrl) {
                                 selectors: providerSettings
                             }, (response) => {
                                 if (chrome.runtime.lastError) {
-                                    console.error('Error sending message:', chrome.runtime.lastError);
+                                    console.error('🔍 Error sending pastePrompt message:', chrome.runtime.lastError);
                                     sendMessageToContent({ action: 'updateSummaryStatus', status: 'Error: Failed to paste prompt' }, false, true);
                                 } else if (response && response.success) {
-                                    console.log('Prompt pasted successfully');
+                                    console.log('🔍 Prompt pasted successfully to AI provider');
                                     sendMessageToContent({ action: 'updateSummaryStatus', status: 'Summary generation in progress...' }, true, false);
                                 } else {
                                     console.error('Failed to paste prompt');
                                     sendMessageToContent({ action: 'updateSummaryStatus', status: 'Error: Failed to paste prompt' }, false, true);
                                 }
                             });
+                            }
                         }, 1000); // Wait for 1 second after the page is loaded
                     }
                 });
@@ -598,11 +770,11 @@ async function copyToClipboardInBackground(text) {
 
 // Replace the window state tracking object with simpler settings
 const WINDOW_SETTINGS = {
-    MIN_CONTENT_LENGTH: 3000,
-    INITIAL_DELAY: 15000,     // Wait 2s before starting to check content
-    CHECK_INTERVAL: 1000,    // Check every 1s
-    STABILITY_DELAY: 3000,   // Content must be stable for 3s
-    MAX_WAIT_TIME: 180000    // Maximum 60s wait time
+    MIN_CONTENT_LENGTH: 1500,   // Reduced from 3000 to catch responses sooner
+    INITIAL_DELAY: 5000,        // Wait 5s before starting to check content
+    CHECK_INTERVAL: 2000,       // Check every 2s to be less aggressive
+    STABILITY_DELAY: 4000,      // Content must be stable for 4s
+    MAX_WAIT_TIME: 180000       // Maximum 180s wait time
 };
 
 // Simplified window monitoring function
@@ -610,67 +782,112 @@ function startWindowCloseMonitoring(tabId, provider) {
     let lastContent = '';
     let stableStartTime = null;
     let monitoringInterval = null;
-
-    // Set maximum wait time
-    const maxWaitTimeout = setTimeout(() => {
-        cleanup('Maximum wait time reached');
-    }, WINDOW_SETTINGS.MAX_WAIT_TIME);
-
-    // Start checking after initial delay
-    setTimeout(() => {
-        monitoringInterval = setInterval(() => {
-            checkContent();
-        }, WINDOW_SETTINGS.CHECK_INTERVAL);
-    }, WINDOW_SETTINGS.INITIAL_DELAY);
-
-    // Main content checking function
-    function checkContent() {
-        chrome.tabs.sendMessage(tabId, { 
-            action: 'getContent',
-            provider: provider
-        }, (response) => {
-            if (chrome.runtime.lastError || !response) {
-                console.log('Error getting content:', chrome.runtime.lastError);
-                return;
-            }
-
-            const currentContent = response.content;
+    
+    // Get provider settings to pass to content script
+    chrome.storage.sync.get(['providers'], (items) => {
+        const providerSettings = items.providers && items.providers[provider];
+        if (!providerSettings) {
+            console.error('Provider settings not found for monitoring:', provider);
+            return;
+        }        // Set maximum wait time
+        const maxWaitTimeout = setTimeout(() => {
+            console.log('Maximum wait time reached, forcing cleanup');
+            cleanup('Maximum wait time reached');
+        }, WINDOW_SETTINGS.MAX_WAIT_TIME);// Start checking after initial delay
+        setTimeout(() => {
+            console.log('Starting content monitoring after initial delay');
+            sendMessageToContent({ 
+                action: 'updateSummaryStatus', 
+                status: 'Monitoring AI response for completion...' 
+            }, true, false);
             
-            // Check if content meets minimum length and hasn't changed
-            if (currentContent.length > WINDOW_SETTINGS.MIN_CONTENT_LENGTH) {
-                if (currentContent === lastContent) {
-                    // Start or continue stability timer
-                    if (!stableStartTime) {
-                        stableStartTime = Date.now();
-                    } else if (Date.now() - stableStartTime >= WINDOW_SETTINGS.STABILITY_DELAY) {
-                        cleanup('Content stable', currentContent);
+            monitoringInterval = setInterval(() => {
+                checkContent();
+            }, WINDOW_SETTINGS.CHECK_INTERVAL);
+        }, WINDOW_SETTINGS.INITIAL_DELAY);
+
+        // Main content checking function
+        function checkContent() {
+            chrome.tabs.sendMessage(tabId, { 
+                action: 'getContent',
+                provider: provider,
+                selectors: providerSettings
+            }, (response) => {
+                if (chrome.runtime.lastError) {
+                    console.log('Error getting content:', chrome.runtime.lastError.message);
+                    return;
+                }
+                
+                if (!response) {
+                    console.log('No response from getContent message');
+                    return;
+                }
+                
+                if (response.error) {
+                    console.error('Content script error:', response.error);
+                    return;
+                }
+
+                const currentContent = response.content;
+                console.log('Content monitoring - length:', currentContent.length, 'min required:', WINDOW_SETTINGS.MIN_CONTENT_LENGTH);
+                  // Check if content meets minimum length and hasn't changed
+                if (currentContent.length > WINDOW_SETTINGS.MIN_CONTENT_LENGTH) {
+                    if (currentContent === lastContent) {
+                        // Start or continue stability timer
+                        if (!stableStartTime) {
+                            stableStartTime = Date.now();
+                            console.log('Content stability timer started');
+                            sendMessageToContent({ 
+                                action: 'updateSummaryStatus', 
+                                status: 'AI response detected, checking for completion...' 
+                            }, true, false);
+                        } else if (Date.now() - stableStartTime >= WINDOW_SETTINGS.STABILITY_DELAY) {
+                            console.log('Content stable for required time, closing window');
+                            sendMessageToContent({ 
+                                action: 'updateSummaryStatus', 
+                                status: 'Response complete! Closing AI window...' 
+                            }, false, false);
+                            cleanup('Content stable', currentContent);
+                        }
+                    } else {
+                        // Content changed, reset stability timer
+                        if (stableStartTime) {
+                            console.log('Content changed, resetting stability timer');
+                        }
+                        stableStartTime = null;
+                        lastContent = currentContent;
                     }
                 } else {
-                    // Content changed, reset stability timer
-                    stableStartTime = null;
-                    lastContent = currentContent;
+                    // Content too short, keep waiting
+                    if (currentContent.length > 0) {
+                        console.log('Content too short, waiting for more...', currentContent.length);
+                    }
                 }
-            }
-        });
-    }
+            });
+        }        // Cleanup function
+        function cleanup(reason, content = null) {
+            console.log('Closing window:', reason);
+            clearInterval(monitoringInterval);
+            clearTimeout(maxWaitTimeout);
 
-    // Cleanup function
-    function cleanup(reason, content = null) {
-        console.log('Closing window:', reason);
-        clearInterval(monitoringInterval);
-        clearTimeout(maxWaitTimeout);
-
-        if (content) {
-            // Forward content to YouTube tabs
-            forwardMessageToYouTubeTabs({ 
-                action: 'divContent', 
-                content: content 
+            if (content) {
+                console.log('Forwarding content to YouTube tabs, length:', content.length);
+                // Forward content to YouTube tabs
+                forwardMessageToYouTubeTabs({ 
+                    action: 'divContent', 
+                    content: content 
+                });
+            }            // Check if tab still exists before trying to close it
+            chrome.tabs.get(tabId, (tab) => {
+                if (chrome.runtime.lastError) {
+                    console.log('Tab already closed or doesn\'t exist:', tabId);
+                } else {
+                    console.log('Closing tab directly:', tabId);
+                    // Call closeNewTab directly instead of sending a message
+                    closeNewTab();
+                }
             });
         }
-
-        // Send message to self to close the tab via the message listener
-        // This ensures consistent handling through closeNewTab()
-        chrome.runtime.sendMessage({ action: 'closeTab' });
-    }
+    });
 }
 
