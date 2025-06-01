@@ -773,8 +773,8 @@ const WINDOW_SETTINGS = {
     MIN_CONTENT_LENGTH: 1500,   // Reduced from 3000 to catch responses sooner
     INITIAL_DELAY: 5000,        // Wait 5s before starting to check content
     CHECK_INTERVAL: 2000,       // Check every 2s to be less aggressive
-    STABILITY_DELAY: 4000,      // Content must be stable for 4s
-    MAX_WAIT_TIME: 180000       // Maximum 180s wait time
+    STABILITY_DELAY: 6000,      // Content must be stable for 6s
+    MAX_WAIT_TIME: 360000       // Maximum 360s wait time
 };
 
 // Simplified window monitoring function
@@ -840,13 +840,8 @@ function startWindowCloseMonitoring(tabId, provider) {
                             sendMessageToContent({ 
                                 action: 'updateSummaryStatus', 
                                 status: 'AI response detected, checking for completion...' 
-                            }, true, false);
-                        } else if (Date.now() - stableStartTime >= WINDOW_SETTINGS.STABILITY_DELAY) {
+                            }, true, false);                        } else if (Date.now() - stableStartTime >= WINDOW_SETTINGS.STABILITY_DELAY) {
                             console.log('Content stable for required time, closing window');
-                            sendMessageToContent({ 
-                                action: 'updateSummaryStatus', 
-                                status: 'Response complete! Closing AI window...' 
-                            }, false, false);
                             cleanup('Content stable', currentContent);
                         }
                     } else {
@@ -864,7 +859,9 @@ function startWindowCloseMonitoring(tabId, provider) {
                     }
                 }
             });
-        }        // Cleanup function
+        }
+
+        // Cleanup function
         function cleanup(reason, content = null) {
             console.log('Closing window:', reason);
             clearInterval(monitoringInterval);
@@ -877,16 +874,28 @@ function startWindowCloseMonitoring(tabId, provider) {
                     action: 'divContent', 
                     content: content 
                 });
-            }            // Check if tab still exists before trying to close it
-            chrome.tabs.get(tabId, (tab) => {
-                if (chrome.runtime.lastError) {
-                    console.log('Tab already closed or doesn\'t exist:', tabId);
-                } else {
-                    console.log('Closing tab directly:', tabId);
-                    // Call closeNewTab directly instead of sending a message
-                    closeNewTab();
-                }
-            });
+                
+                // Add a small delay to ensure content is displayed before closing window
+                setTimeout(() => {
+                    closeWindow();
+                }, 500);
+            } else {
+                // Close immediately if no content to forward
+                closeWindow();
+            }
+            
+            function closeWindow() {
+                // Check if tab still exists before trying to close it
+                chrome.tabs.get(tabId, (tab) => {
+                    if (chrome.runtime.lastError) {
+                        console.log('Tab already closed or doesn\'t exist:', tabId);
+                    } else {
+                        console.log('Closing tab directly:', tabId);
+                        // Call closeNewTab directly instead of sending a message
+                        closeNewTab();
+                    }
+                });
+            }
         }
     });
 }
