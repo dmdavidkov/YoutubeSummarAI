@@ -47,8 +47,11 @@
                     break;
                 case 'createDockedDiv':
                     if (!dockedDiv) createDockedDiv();
+                    break;                case 'divContent':
+                    updateSummaryContent(request.content || request.status, request.isLoading, request.isError);
+                    // Send confirmation back for divContent messages
+                    sendResponse({ success: true, contentLength: (request.content || '').length });
                     break;
-                case 'divContent':
                 case 'updateSummaryStatus':
                     updateSummaryContent(request.content || request.status, request.isLoading, request.isError);
                     break;
@@ -152,15 +155,14 @@
             height: ${primaryDiv.style.height};
             right: 0;
             top: 0;
-        `;
-
-        // Create our docked div
+        `;        // Create our docked div
         dockedDiv = document.createElement('div');
         dockedDiv.id = 'myDockedDiv';
         dockedDiv.style.cssText = `
             width: 100%;
             max-height: 90vh;
             overflow-y: auto;
+            overflow-x: hidden;
             margin-bottom: 20px;
             box-sizing: border-box;
             border-radius: 8px;
@@ -309,9 +311,7 @@
         } catch (error) {
             console.error('Error processing anchor click:', error);
         }
-    }
-
-    function updateSummaryContent(newContent, isLoading = false, isError = false) {
+    }    function updateSummaryContent(newContent, isLoading = false, isError = false) {
         const iconHTML = isError ? createErrorIcon() : (isLoading ? createSpinner() : '');
         let contentHTML;
         
@@ -319,16 +319,38 @@
             contentHTML = createContentHTML(newContent);
         } else {
             // Parse markdown when it's not a loading or error state
-            contentHTML = marked.parse(newContent);
+            contentHTML = `<div class="summary-content">${marked.parse(newContent)}</div>`;
         }
         
         const styleHTML = createStyleHTML();
+        const newContent_HTML = styleHTML + iconHTML + contentHTML;
 
-        bufferDiv.innerHTML = styleHTML + iconHTML + contentHTML;
+        bufferDiv.innerHTML = newContent_HTML;
 
         const summaryDiv = document.getElementById('summary');
-        if (summaryDiv && summaryDiv.innerHTML !== bufferDiv.innerHTML) {
-            summaryDiv.innerHTML = bufferDiv.innerHTML;
+        if (summaryDiv) {
+            // Only update if content actually changed to prevent unnecessary re-renders
+            if (summaryDiv.innerHTML !== newContent_HTML) {
+                // For non-loading states with existing content, use a smooth transition
+                if (!isLoading && !isError && summaryDiv.innerHTML.trim() !== '' && summaryDiv.querySelector('.summary-content')) {
+                    // Add a smooth fade transition
+                    summaryDiv.style.opacity = '0.8';
+                    
+                    // Use requestAnimationFrame to ensure smooth rendering
+                    requestAnimationFrame(() => {
+                        summaryDiv.innerHTML = newContent_HTML;
+                        
+                        // Wait for the next frame to ensure content is rendered
+                        requestAnimationFrame(() => {
+                            summaryDiv.style.opacity = '1';
+                        });
+                    });
+                } else {
+                    // For loading states or initial content, update immediately
+                    summaryDiv.innerHTML = newContent_HTML;
+                    summaryDiv.style.opacity = '1';
+                }
+            }
         }
     }
 
@@ -366,14 +388,80 @@
                 margin-top: 10px;
             ">${content}</p>
         `;
-    }
-
-    function createStyleHTML() {
+    }    function createStyleHTML() {
         return `
             <style>
                 @keyframes spin {
                     0% { transform: rotate(0deg); }
                     100% { transform: rotate(360deg); }
+                }
+                
+                #summary {
+                    transition: opacity 0.3s ease-in-out;
+                }
+                
+                .summary-content {
+                    opacity: 1;
+                    transition: opacity 0.2s ease-in-out;
+                }
+                
+                /* Responsive overrides for docked div context */
+                #myDockedDiv body {
+                    width: 100% !important;
+                    min-width: unset !important;
+                    max-width: unset !important;
+                    padding: 15px !important;
+                    margin: 0 !important;
+                    box-sizing: border-box !important;
+                    overflow-x: hidden !important;
+                }
+                
+                #myDockedDiv .card {
+                    width: 100% !important;
+                    max-width: unset !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    box-sizing: border-box !important;
+                }
+                
+                #myDockedDiv #summary {
+                    width: 100% !important;
+                    max-width: unset !important;
+                    word-wrap: break-word !important;
+                    overflow-wrap: break-word !important;
+                    word-break: break-word !important;
+                    box-sizing: border-box !important;
+                }
+                
+                #myDockedDiv #summary * {
+                    max-width: 100% !important;
+                    box-sizing: border-box !important;
+                }
+                
+                /* Ensure proper text wrapping for all content */
+                #myDockedDiv #summary p,
+                #myDockedDiv #summary li,
+                #myDockedDiv #summary h1,
+                #myDockedDiv #summary h2,
+                #myDockedDiv #summary h3,
+                #myDockedDiv #summary blockquote {
+                    word-wrap: break-word !important;
+                    overflow-wrap: break-word !important;
+                    word-break: break-word !important;
+                    white-space: normal !important;
+                }
+                
+                /* Fix button container to prevent overflow */
+                #myDockedDiv .card-header {
+                    width: 100% !important;
+                    box-sizing: border-box !important;
+                    flex-wrap: wrap !important;
+                }
+                
+                #myDockedDiv #generateSummaryBtn {
+                    width: 100% !important;
+                    max-width: unset !important;
+                    box-sizing: border-box !important;
                 }
             </style>
         `;

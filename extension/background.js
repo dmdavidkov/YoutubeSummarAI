@@ -245,9 +245,30 @@ function handleSelectorWaiting(request) {
 
 // Forward message to YouTube tabs
 function forwardMessageToYouTubeTabs(message) {
-    chrome.tabs.query({ url: "https://www.youtube.com/*" }, (tabs) => {
-        tabs.forEach(tab => {
-            chrome.tabs.sendMessage(tab.id, message);
+    return new Promise((resolve) => {
+        chrome.tabs.query({ url: "https://www.youtube.com/*" }, (tabs) => {
+            if (tabs.length === 0) {
+                console.log('No YouTube tabs found');
+                resolve(false);
+                return;
+            }
+            
+            let completedTabs = 0;
+            const totalTabs = tabs.length;
+            
+            tabs.forEach(tab => {
+                chrome.tabs.sendMessage(tab.id, message, (response) => {
+                    completedTabs++;
+                    if (chrome.runtime.lastError) {
+                        console.log(`Error sending message to tab ${tab.id}:`, chrome.runtime.lastError.message);
+                    }
+                    
+                    // Resolve when all tabs have been processed
+                    if (completedTabs === totalTabs) {
+                        resolve(true);
+                    }
+                });
+            });
         });
     });
 }
@@ -828,13 +849,10 @@ function startWindowCloseMonitoring(tabId, provider) {
         const maxWaitTimeout = setTimeout(() => {
             console.log('Maximum wait time reached, forcing cleanup');
             cleanup('Maximum wait time reached');
-        }, WINDOW_SETTINGS.MAX_WAIT_TIME);// Start checking after initial delay
+        }, WINDOW_SETTINGS.MAX_WAIT_TIME);        // Start checking after initial delay
         setTimeout(() => {
             console.log('Starting content monitoring after initial delay');
-            sendMessageToContent({ 
-                action: 'updateSummaryStatus', 
-                status: 'Monitoring AI response for completion...' 
-            }, true, false);
+            // Removed status message that could interfere with summary content
             
             monitoringInterval = setInterval(() => {
                 checkContent();
@@ -866,16 +884,13 @@ function startWindowCloseMonitoring(tabId, provider) {
                 const currentContent = response.content;
                 console.log('Content monitoring - length:', currentContent.length, 'min required:', WINDOW_SETTINGS.MIN_CONTENT_LENGTH);
                   // Check if content meets minimum length and hasn't changed
-                if (currentContent.length > WINDOW_SETTINGS.MIN_CONTENT_LENGTH) {
-                    if (currentContent === lastContent) {
+                if (currentContent.length > WINDOW_SETTINGS.MIN_CONTENT_LENGTH) {                    if (currentContent === lastContent) {
                         // Start or continue stability timer
                         if (!stableStartTime) {
                             stableStartTime = Date.now();
                             console.log('Content stability timer started');
-                            sendMessageToContent({ 
-                                action: 'updateSummaryStatus', 
-                                status: 'AI response detected, checking for completion...' 
-                            }, true, false);                        } else if (Date.now() - stableStartTime >= WINDOW_SETTINGS.STABILITY_DELAY) {
+                            // Removed status message that was overriding summary content
+                        } else if (Date.now() - stableStartTime >= WINDOW_SETTINGS.STABILITY_DELAY) {
                             console.log('Content stable for required time, closing window');
                             cleanup('Content stable', currentContent);
                         }
@@ -894,26 +909,36 @@ function startWindowCloseMonitoring(tabId, provider) {
                     }
                 }
             });
-        }
-
-        // Cleanup function
-        function cleanup(reason, content = null) {
+        }        // Cleanup function
+        async function cleanup(reason, content = null) {
             console.log('Closing window:', reason);
             clearInterval(monitoringInterval);
             clearTimeout(maxWaitTimeout);
 
-            if (content) {
-                console.log('Forwarding content to YouTube tabs, length:', content.length);
-                // Forward content to YouTube tabs
-                forwardMessageToYouTubeTabs({ 
-                    action: 'divContent', 
-                    content: content 
-                });
+            if (content) {                console.log('Forwarding content to YouTube tabs, length:', content.length);
                 
-                // Add a small delay to ensure content is displayed before closing window
-                setTimeout(() => {
+                try {
+                    // Forward content to YouTube tabs and wait for delivery
+                    const delivered = await forwardMessageToYouTubeTabs({ 
+                        action: 'divContent', 
+                        content: content 
+                    });
+                      if (delivered) {
+                        console.log('Content successfully delivered to YouTube tabs');
+                        
+                        // Wait for content to be processed and displayed before closing window
+                        // Increased delay to account for markdown parsing and DOM updates
+                        setTimeout(() => {
+                            closeWindow();
+                        }, 2000); // Increased to 2 seconds for better reliability
+                    } else {
+                        console.log('No YouTube tabs found, closing immediately');
+                        closeWindow();
+                    }
+                } catch (error) {
+                    console.error('Error delivering content:', error);
                     closeWindow();
-                }, 500);
+                }
             } else {
                 // Close immediately if no content to forward
                 closeWindow();
